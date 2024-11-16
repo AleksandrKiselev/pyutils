@@ -1,1 +1,0 @@
-python py_compile_to_exe.py
