@@ -22,8 +22,14 @@ def main():
                 file_path = os.path.join(root, file)
                 destination_path = os.path.join(destination_folder, file)
 
-                if not os.path.exists(destination_path):
-                    shutil.move(file_path, destination_path)
+                if os.path.exists(destination_path):
+                    base, extension = os.path.splitext(file)
+                    count = 1
+                    while os.path.exists(os.path.join(destination_folder, f"{base} ({count}){extension}")):
+                        count += 1
+                    destination_path = os.path.join(destination_folder, f"{base} ({count}){extension}")
+
+                shutil.move(file_path, destination_path)
         print("File transfer completed.")
     else:
         print("Source folder not found.")
