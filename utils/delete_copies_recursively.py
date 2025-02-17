@@ -19,7 +19,7 @@ def main():
                 match = pattern.match(file)
                 if match:
                     original_file = match.group(1) + os.path.splitext(file)[1]
-                    if original_file in original_files:
+                    if o riginal_file in original_files:
                         file_path = os.path.join(root, file)
                         print(f"Deleting: {file_path}")
                         os.remove(file_path)
