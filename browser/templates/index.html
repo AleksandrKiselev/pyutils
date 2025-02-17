@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Viewer</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="folder-list" class="folder-list">
+            {% for folder in subfolders %}
+                <a href="/{{ folder }}" onclick="updateUrl(event, '{{ folder }}')">
+                    {{ folder }} ({{ folder_counts[folder] }})
+                </a>
+            {% endfor %}
+        </div>
+
+        <div class="search-sort-container">
+            <div class="search-container">
+                <input type="text" id="search-box" placeholder="Фильтр по промпту..." oninput="filterImages()">
+            </div>
+
+            <div class="sort-container">
+                <select id="sort-select" onchange="changeSort()">
+                    <option value="date-asc">Дата ↑</option>
+                    <option value="date-desc">Дата ↓</option>
+                    <option value="filename-asc">Имя ↑</option>
+                    <option value="filename-desc">Имя ↓</option>
+                    <option value="prompt-asc">Промпт ↑</option>
+                    <option value="prompt-desc">Промпт ↓</option>
+                    <option value="rating-asc">Рейтинг ↑</option>
+                    <option value="rating-desc">Рейтинг ↓</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="scroll-buttons">
+            <button id="scroll-to-top" onclick="scrollToTop()">▲</button>
+        </div>
+
+        <div id="tooltip" class="image-tooltip"></div>
+        <div id="loading">Loading...</div>
+        <div id="gallery" class="gallery"></div>
+    </div>
+
+    <div class="fullscreen-img" id="fullscreen-container">
+        <div class="fullscreen-image-wrapper">
+            <div id="fullscreen-prompt" data-prompt="">
+            <img id="fullscreen-img" src="" alt="Fullscreen Image">
+        </div>
+        <button class="nav-arrow nav-left" onclick="prevImage()">◀</button>
+        <button class="nav-arrow nav-right" onclick="nextImage()">▶</button>
+    </div>
+
+    <script>
+        const IMAGES_PER_ROW = {{ images_per_row }};
+    </script>
+    <script src="/static/script.js"></script>
+</body>
+</html>
