@@ -1,0 +1,6 @@
+{
+    "image_folder": "d:\\AI-Software\\configs\\browser\\static\\images",
+    "images_per_row": 5,
+    "thumbnail_size": 512,
+    "items_per_page": 20
+}

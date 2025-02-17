@@ -3,8 +3,8 @@ import json
 import re
 
 
-input_directory = 'g:\AI-Software\stable-diffusion-webui\models\Lora\\test'
-output_file = 'd:\AI-Software\configs\wildcards\lora\\test.txt'
+input_directory = r'g:\AI-Software\stable-diffusion-webui\models\Lora\test'
+output_file = r'd:\AI-Software\configs\wildcards\lora\test.txt'
 
 
 def process_prompt(prompt):
@@ -21,7 +21,7 @@ with open(output_file, 'w') as outfile:
                 try:
                     data = json.load(json_file)
                     prompt = process_prompt(data.get('activation text', ''))
-                    line = f"<lora:test\\{os.path.splitext(filename)[0]}:1> {prompt}\n"
+                    line = f"<lora:test\\{os.path.splitext(filename)[0]}:0.8> {prompt}\n"
                     outfile.write(line)
                 except json.JSONDecodeError as e:
                     print(f"Error parsing {filename}: {e}")

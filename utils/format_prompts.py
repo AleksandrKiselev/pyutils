@@ -4,7 +4,7 @@ from fuzzywuzzy import fuzz
 
 def format_line(line, apply_mixed_case_conversion):
     line = re.sub(r',\s*$', '', line.strip())
-    line = re.sub(r',([^\s])', r', \1', line)
+    line = re.sub(r',(\S)', r', \1', line)
 
     def to_lower_if_mixed(word):
         if any(c.islower() for c in word) and any(c.isupper() for c in word):
@@ -44,8 +44,8 @@ def find_similar_lines(lines, similarity_threshold):
     return unique_lines
 
 
-def process_file(file_path, similarity_threshold, sort=False, add_empty_lines=True, apply_mixed_case_conversion=True):
-    with open(file_path, 'r', encoding='utf-8') as file:
+def process_file(path, similarity_threshold, sort=False, add_empty_lines=True, apply_mixed_case_conversion=True):
+    with open(path, 'r', encoding='utf-8') as file:
         lines = [format_line(line, apply_mixed_case_conversion) for line in file.readlines()]
 
         lines = find_similar_lines(lines, similarity_threshold)
@@ -61,9 +61,9 @@ def process_file(file_path, similarity_threshold, sort=False, add_empty_lines=Tr
         else:
             formatted_lines = [line for line in lines if line.strip()]
 
-        with open(file_path, 'w', encoding='utf-8') as file:
-            file.write('\n'.join(formatted_lines))
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(formatted_lines))
 
 
-file_path = r'D:\AI-Software\configs\wildcards\raw_char.txt'
-process_file(file_path, similarity_threshold=80, sort=True, add_empty_lines=False, apply_mixed_case_conversion=True)
+file_path = r'D:\AI-Software\configs\wildcards\prompt\raw.txt'
+process_file(file_path, similarity_threshold=95, sort=True, add_empty_lines=False, apply_mixed_case_conversion=True)
