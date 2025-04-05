@@ -8,14 +8,15 @@
 </head>
 <body>
     <div class="container">
-        <div id="sidebar" class="sidebar hidden">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar hidden">
             <div class="sidebar-title">📂 Папки</div>
             <div class="sidebar-folders">
                 {% macro render_tree(tree) %}
                 <ul class="folder-tree">
                     {% for path, node in tree.items() %}
-                        <li class="folder-item{% if node.children %} has-children{% endif %}">
-                            <div class="folder-row">
+                        <li class="folder-item{% if node.children %} has-children expanded{% endif %}">
+                            <div class="folder-row" data-has-children="{{ node.children is defined and node.children }}">
                                 {% if node.children %}
                                     <span class="folder-toggle" onclick="toggleFolder(event)">⯈</span>
                                 {% else %}
@@ -25,7 +26,6 @@
                                     {{ node.name }} ({{ node.count }})
                                 </a>
                             </div>
-
                             {% if node.children %}
                                 <div class="folder-children">
                                     {{ render_tree(node.children) }}
@@ -35,17 +35,20 @@
                     {% endfor %}
                 </ul>
                 {% endmacro %}
-
                 {{ render_tree(folder_tree) }}
             </div>
-        </div>
-        <button id="menu-toggle" class="menu-toggle"><span id="menu-icon">⯈</span></button>
+        </aside>
 
+        <!-- Sidebar toggle -->
+        <button id="menu-toggle" class="menu-toggle">
+            <span id="menu-icon">⯈</span>
+        </button>
+
+        <!-- Search and Sort -->
         <div class="search-sort-container">
             <div class="search-container">
                 <input type="text" id="search-box" placeholder="Фильтр по промпту..." oninput="filterImages()">
             </div>
-
             <div class="sort-container">
                 <select id="sort-select" onchange="changeSort()">
                     <option value="date-asc">Дата ↑</option>
@@ -60,24 +63,32 @@
             </div>
         </div>
 
+        <!-- Scroll to top button -->
         <div id="scroll-buttons">
             <button id="scroll-to-top" onclick="scrollToTop()">▲</button>
         </div>
 
+        <!-- Tooltip -->
         <div id="tooltip" class="image-tooltip"></div>
+
+        <!-- Loading indicator -->
         <div id="loading">Loading...</div>
-        <div id="gallery" class="gallery"></div>
+
+        <!-- Gallery -->
+        <main id="gallery" class="gallery"></main>
     </div>
 
+    <!-- Fullscreen image viewer -->
     <div class="fullscreen-img" id="fullscreen-container">
         <div class="fullscreen-image-wrapper">
-            <div id="fullscreen-prompt" data-prompt="">
             <img id="fullscreen-img" src="" alt="Fullscreen Image">
+            <div id="fullscreen-prompt" data-prompt=""></div>
         </div>
         <button class="nav-arrow nav-left" onclick="prevImage()">◀</button>
         <button class="nav-arrow nav-right" onclick="nextImage()">▶</button>
     </div>
 
+    <!-- JavaScript Constants -->
     <script>
         const IMAGES_PER_ROW = {{ images_per_row }};
     </script>
