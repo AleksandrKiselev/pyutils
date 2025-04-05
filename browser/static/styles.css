@@ -363,3 +363,148 @@ body {
     color: var(--accent-color);
     font-size: 20px;
 }
+
+/* Боковое меню */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    min-width: 180px;
+    max-width: 280px;
+    width: fit-content;
+    background: rgba(30, 30, 30, 0.25);         /* ещё более прозрачный */
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    color: var(--text-color);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 12px 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transform: translateX(0);
+    transition: transform 0.3s ease-in-out;
+    z-index: 1001;
+    text-align: left;
+    white-space: nowrap;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar.hidden {
+    transform: translateX(-100%);
+}
+
+/* Заголовок меню */
+.sidebar-title {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 12px;
+    color: var(--accent-color);
+}
+
+/* Контейнер списка */
+.sidebar-folders {
+    text-align: left;
+}
+
+/* Дерево папок */
+.folder-tree {
+    list-style: none;
+    padding-left: 10px;
+    margin: 0;
+    text-align: left;
+}
+
+.folder-tree li {
+    margin: 3px 0;
+}
+
+.folder-tree li a {
+    text-decoration: none;
+    color: var(--text-color);
+    font-size: 13px;
+    display: block;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.2s;
+    text-align: left;
+}
+
+.folder-tree li a:hover {
+    background-color: var(--hover-bg);
+}
+
+/* Кнопка-гамбургер */
+.menu-toggle {
+    position: fixed;
+    top: 14px;
+    left: 10px; /* по умолчанию */
+    z-index: 1100;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f0f0f0;
+    font-size: 18px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s, left 0.3s;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+    opacity: 0.8;
+}
+
+/* Сдвиг основного контента при открытом меню (опционально) */
+.container {
+    margin-left: 0;
+    transition: margin-left 0.3s ease-in-out;
+}
+
+.sidebar-visible .container {
+    margin-left: 280px;
+}
+
+.folder-item {
+    margin: 2px 0;
+}
+
+.folder-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.folder-toggle {
+    font-size: 10px;
+    user-select: none;
+    width: 14px;
+    text-align: center;
+    transition: transform 0.2s;
+}
+
+.folder-toggle-placeholder {
+    display: inline-block;
+    width: 14px;
+}
+
+.folder-children {
+    margin-left: 14px;
+    padding-left: 6px;
+    border-left: 1px solid var(--border-color);
+}
+
+.folder-children.hidden {
+    display: none;
+}
+
+.folder-item.expanded > .folder-row .folder-toggle {
+    transform: rotate(90deg);
+}
+
+.folder-item.has-children {
+    /* все папки с детьми открыты по умолчанию */
+}
+
+.folder-item.has-children > .folder-row .folder-toggle {
+    transform: rotate(90deg);
+}
+

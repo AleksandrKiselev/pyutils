@@ -8,13 +8,38 @@
 </head>
 <body>
     <div class="container">
-        <div id="folder-list" class="folder-list">
-            {% for folder in subfolders %}
-                <a href="/{{ folder }}" onclick="updateUrl(event, '{{ folder }}')">
-                    {{ folder }} ({{ folder_counts[folder] }})
-                </a>
-            {% endfor %}
+        <div id="sidebar" class="sidebar hidden">
+            <div class="sidebar-title">📂 Папки</div>
+            <div class="sidebar-folders">
+                {% macro render_tree(tree) %}
+                <ul class="folder-tree">
+                    {% for path, node in tree.items() %}
+                        <li class="folder-item{% if node.children %} has-children{% endif %}">
+                            <div class="folder-row">
+                                {% if node.children %}
+                                    <span class="folder-toggle" onclick="toggleFolder(event)">⯈</span>
+                                {% else %}
+                                    <span class="folder-toggle-placeholder"></span>
+                                {% endif %}
+                                <a href="/{{ path }}" onclick="updateUrl(event, '{{ path }}')">
+                                    {{ node.name }} ({{ node.count }})
+                                </a>
+                            </div>
+
+                            {% if node.children %}
+                                <div class="folder-children">
+                                    {{ render_tree(node.children) }}
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+                {% endmacro %}
+
+                {{ render_tree(folder_tree) }}
+            </div>
         </div>
+        <button id="menu-toggle" class="menu-toggle"><span id="menu-icon">⯈</span></button>
 
         <div class="search-sort-container">
             <div class="search-container">

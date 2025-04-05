@@ -174,6 +174,27 @@ def get_sorted_images(folder_path, sort_by="date", order="asc"):
     return images
 
 
+def build_folder_tree(base_path, relative=""):
+    tree = {}
+    full_path = os.path.join(base_path, relative)
+
+    for entry in os.scandir(full_path):
+        if entry.is_dir():
+            rel_path = os.path.join(relative, entry.name).replace("\\", "/")
+            image_count = sum(
+                1 for f in os.listdir(entry.path)
+                if f.lower().endswith(tuple(ALLOWED_EXTENSIONS)) and os.path.isfile(os.path.join(entry.path, f))
+            )
+            subtree = build_folder_tree(base_path, rel_path)
+            if image_count > 0 or subtree:
+                tree[rel_path] = {
+                    "name": entry.name,
+                    "count": image_count,
+                    "children": subtree
+                }
+    return tree
+
+
 @app.route("/")
 @app.route("/<path:subpath>")
 def index(subpath=""):
@@ -182,27 +203,10 @@ def index(subpath=""):
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return jsonify({"error": "Path not exist"}), 404
 
-    subfolders = []
-    folder_counts = {}
-
-    for root, dirs, files in os.walk(folder_path):
-        for d in dirs:
-            full_path = os.path.join(root, d)
-            image_count = sum(
-                1 for file in os.listdir(full_path)
-                if file.lower().endswith(tuple(ALLOWED_EXTENSIONS)) and os.path.isfile(os.path.join(full_path, file))
-            )
-
-            if image_count > 0:
-                relative_path = os.path.relpath(full_path, IMAGE_FOLDER).replace("\\", "/")
-                subfolders.append(relative_path)
-                folder_counts[relative_path] = image_count
-
-    subfolders.sort()
+    folder_tree = build_folder_tree(IMAGE_FOLDER)
 
     return render_template("index.html",
-                           subfolders=subfolders,
-                           folder_counts=folder_counts,
+                           folder_tree=folder_tree,
                            images_per_row=config["images_per_row"])
 
 

@@ -379,52 +379,34 @@ function hideStars(event) {
     if (container) container.style.opacity = "0";
 }
 
+function toggleFolder(event) {
+    event.stopPropagation(); // Не даём всплыть на родителя
+    const row = event.currentTarget.closest(".folder-row");
+    const item = row.closest(".folder-item");
+    const children = item.querySelector(".folder-children");
 
-document.getElementById("gallery").addEventListener("mouseleave", hideTooltip);
-document.getElementById("gallery").addEventListener("mousemove", (event) => {
-    if (tooltip.style.display === "block") {
-        updateTooltipPosition(event);
+    const isExpanded = item.classList.toggle("expanded");
+    if (isExpanded) {
+        children.classList.remove("hidden");
+    } else {
+        children.classList.add("hidden");
     }
-});
+}
 
-document.addEventListener("change", (event) => {
-    if (event.target.classList.contains("image-checkbox")) {
-        saveCheckboxState(event);
-        updateImageOpacity();
+function updateToggleButtonPosition() {
+    const sidebar = document.getElementById("sidebar");
+    const toggleBtn = document.getElementById("menu-toggle");
+    const icon = document.getElementById("menu-icon");
+
+    if (sidebar.classList.contains("hidden")) {
+        toggleBtn.style.left = "10px";
+        icon.textContent = "⯈"; // Свернуто
+    } else {
+        const sidebarWidth = sidebar.offsetWidth;
+        toggleBtn.style.left = `${sidebarWidth + 10}px`;
+        icon.textContent = "⯇"; // Развернуто
     }
-});
-
-document.addEventListener("keydown", (event) => {
-    const fullscreenVisible = document.getElementById('fullscreen-container').style.display === "flex";
-
-    if (fullscreenVisible) {
-        if (event.key === "ArrowLeft") {
-            prevImage();
-        } else if (event.key === "ArrowRight") {
-            nextImage();
-        } else if (event.key === "Escape") {
-            closeFullscreen();
-        }
-    }
-
-    if (event.ctrlKey && (event.key.toLowerCase() === "c" || event.key.toLowerCase() === "с")) {
-        if (fullscreenVisible) {
-            copyPromptFullscreen();
-        } else {
-            console.log("CTRL+C pressed");
-            copyTooltipText();
-        }
-    }
-});
-
-document.getElementById("fullscreen-container").addEventListener("click", (event) => {
-    if (!event.target.closest(".fullscreen-image-wrapper") &&
-        !event.target.closest(".copy-btn") &&
-        !event.target.closest(".close-btn") &&
-        !event.target.closest(".nav-arrow")) {
-        closeFullscreen();
-    }
-});
+}
 
 window.onpopstate = function () {
     loadContent();
@@ -438,27 +420,101 @@ window.onload = function () {
     loadContent();
     loadCheckboxState();
     document.getElementById("scroll-to-top").classList.add("hidden");
+    document.getElementById("menu-toggle").addEventListener("click", () => {
+        const sidebar = document.getElementById("sidebar");
+        const container = document.querySelector(".container");
+
+        sidebar.classList.toggle("hidden");
+        container.classList.toggle("sidebar-visible");
+        updateToggleButtonPosition();
+    });
+
+    document.querySelectorAll(".folder-row").forEach(row => {
+        const hasChildren = row.dataset.hasChildren === "true";
+        if (!hasChildren) return;
+
+        row.addEventListener("click", () => {
+            const parent = row.closest(".folder-item");
+            const children = parent.querySelector(".folder-children");
+
+            const isExpanded = parent.classList.toggle("expanded");
+            if (isExpanded) {
+                children.classList.remove("hidden");
+            } else {
+                children.classList.add("hidden");
+            }
+        });
+    });
+
+
+    window.addEventListener("scroll", () => {
+        // 1. Ленивое подгружение изображений при прокрутке вниз
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+            loadMoreImages();
+        }
+
+        // 2. Показываем/скрываем кнопку "Вверх" при скролле
+        const scrollTopButton = document.getElementById("scroll-to-top");
+        if (window.scrollY > 300) {
+            scrollTopButton.classList.remove("hidden");
+        } else {
+            scrollTopButton.classList.add("hidden");
+        }
+
+        // 3. Корректируем положение тултипа, если он выходит за границы экрана
+        if (tooltip.style.display === "block") {
+            const tooltipRect = tooltip.getBoundingClientRect();
+            if (tooltipRect.bottom > window.innerHeight) {
+                tooltip.style.top = `${window.innerHeight - tooltipRect.height - 10}px`;
+            }
+        }
+    });
+
+    document.getElementById("gallery").addEventListener("mouseleave", hideTooltip);
+    document.getElementById("gallery").addEventListener("mousemove", (event) => {
+        if (tooltip.style.display === "block") {
+            updateTooltipPosition(event);
+        }
+    });
+
+    document.addEventListener("change", (event) => {
+        if (event.target.classList.contains("image-checkbox")) {
+            saveCheckboxState(event);
+            updateImageOpacity();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        const fullscreenVisible = document.getElementById('fullscreen-container').style.display === "flex";
+
+        if (fullscreenVisible) {
+            if (event.key === "ArrowLeft") {
+                prevImage();
+            } else if (event.key === "ArrowRight") {
+                nextImage();
+            } else if (event.key === "Escape") {
+                closeFullscreen();
+            }
+        }
+
+        if (event.ctrlKey && (event.key.toLowerCase() === "c" || event.key.toLowerCase() === "с")) {
+            if (fullscreenVisible) {
+                copyPromptFullscreen();
+            } else {
+                console.log("CTRL+C pressed");
+                copyTooltipText();
+            }
+        }
+    });
+
+    document.getElementById("fullscreen-container").addEventListener("click", (event) => {
+        if (!event.target.closest(".fullscreen-image-wrapper") &&
+            !event.target.closest(".copy-btn") &&
+            !event.target.closest(".close-btn") &&
+            !event.target.closest(".nav-arrow")) {
+            closeFullscreen();
+        }
+    });
 };
 
-window.addEventListener("scroll", () => {
-    // 1. Ленивое подгружение изображений при прокрутке вниз
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
-        loadMoreImages();
-    }
-
-    // 2. Показываем/скрываем кнопку "Вверх" при скролле
-    const scrollTopButton = document.getElementById("scroll-to-top");
-    if (window.scrollY > 300) {
-        scrollTopButton.classList.remove("hidden");
-    } else {
-        scrollTopButton.classList.add("hidden");
-    }
-
-    // 3. Корректируем положение тултипа, если он выходит за границы экрана
-    if (tooltip.style.display === "block") {
-        const tooltipRect = tooltip.getBoundingClientRect();
-        if (tooltipRect.bottom > window.innerHeight) {
-            tooltip.style.top = `${window.innerHeight - tooltipRect.height - 10}px`;
-        }
-    }
-});
+updateToggleButtonPosition();
