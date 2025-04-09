@@ -58,14 +58,40 @@ body {
 }
 
 /* ==========================
-   🔍 Search & Sort
+   🔍 Search & Sort & Current folder
 ========================== */
-.search-sort-container {
+.search-sort-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.search-sort-center {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: 10px;
+    margin: 0 auto;
+    flex: 1;
+}
+
+.search-sort-left {
+    width: 60px; /* или auto */
+}
+
+.current-folder {
+    font-size: 13px;
+    color: var(--accent-color);
+    opacity: 0.85;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+    text-align: right;
+    user-select: none;
+    padding-right: 4px;
 }
 
 #search-box,

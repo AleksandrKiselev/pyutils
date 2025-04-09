@@ -7,25 +7,13 @@ let currentImages = [];
 let currentIndex = 0;
 let searchQuery = "";
 let tooltipTimeout;
-let sortBy = getCookie("sort_by") || "date-asc";
-
-// --- Cookie Utils ---
-function setCookie(name, value, days = 365) {
-    const expires = new Date(Date.now() + days * 864e5).toUTCString();
-    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
-}
-
-function getCookie(name) {
-    return document.cookie
-        .split("; ")
-        .map(c => c.split("="))
-        .find(([key]) => key === name)?.[1] || null;
-}
+let sortBy = "date-asc";
 
 // --- Load Content ---
 async function updateUrl(event, path) {
     event.preventDefault();
     if (window.location.pathname === "/" + path) return;
+    saveGalleryState();
     window.history.pushState({}, '', '/' + path);
     await loadContent();
     updateActiveFolderHighlight();
@@ -35,7 +23,9 @@ async function updateUrl(event, path) {
 async function loadContent() {
     document.getElementById('loading').style.display = 'block';
     const path = window.location.pathname;
+    restoreGalleryState();
     await (path === "/" ? loadFolders() : loadImages());
+    updateCurrentFolderDisplay();
     document.getElementById('loading').style.display = 'none';
 }
 
@@ -69,6 +59,13 @@ function updateActiveFolderHighlight() {
         activeLink.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 }
+
+function updateCurrentFolderDisplay() {
+    const currentPath = window.location.pathname.replace(/^\/+/, "");
+    const label = currentPath || "(корень)";
+    document.getElementById("current-folder").textContent = `📁 ${label}`;
+}
+
 
 // --- Image Gallery ---
 async function loadImages() {
@@ -125,17 +122,58 @@ function renderImageCards(images) {
 
 function filterImages() {
     searchQuery = document.getElementById("search-box").value.trim();
-    setCookie("search_query", searchQuery);
     loadImages();
 }
 
-function loadSearchFromCookies() {
-    const saved = getCookie("search_query");
-    if (saved) {
-        searchQuery = decodeURIComponent(saved);
-        document.getElementById("search-box").value = searchQuery;
+function saveGalleryState() {
+    const state = {
+        currentPath: window.location.pathname,
+        scrollY: window.scrollY,
+        searchQuery: document.getElementById("search-box").value.trim(),
+        sortBy: document.getElementById("sort-select").value,
+        sidebarVisible: !document.getElementById("sidebar").classList.contains("hidden")
+    };
+
+    localStorage.setItem("galleryState", JSON.stringify(state));
+}
+
+
+function restoreGalleryState() {
+    const raw = localStorage.getItem("galleryState");
+    if (!raw) return;
+
+    try {
+        const state = JSON.parse(raw);
+
+        if (state.searchQuery !== undefined) {
+            searchQuery = state.searchQuery;
+            document.getElementById("search-box").value = searchQuery;
+        }
+
+        if (state.sortBy) {
+            sortBy = state.sortBy;
+            document.getElementById("sort-select").value = sortBy;
+        }
+
+        if (typeof state.sidebarVisible === "boolean") {
+            const sidebar = document.getElementById("sidebar");
+            const container = document.querySelector(".container");
+            sidebar.classList.toggle("hidden", !state.sidebarVisible);
+            container.classList.toggle("sidebar-visible", state.sidebarVisible);
+        }
+
+        setTimeout(() => {
+            window.scrollTo(0, state.scrollY || 0);
+        }, 0);
+    } catch (e) {
+        console.warn("Не удалось восстановить галерею:", e);
     }
 }
+
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 
 // --- Tooltip ---
 function escapeHTML(str) {
@@ -309,7 +347,6 @@ async function deleteThumbnail(event, filename) {
 // --- UI Events ---
 function changeSort() {
     sortBy = document.getElementById("sort-select").value;
-    setCookie("sort_by", sortBy);
     loadImages();
 }
 
@@ -332,7 +369,24 @@ function updateToggleButtonPosition() {
 
 // --- Init ---
 window.onload = function () {
-    loadSearchFromCookies();
+    const saved = localStorage.getItem("galleryState");
+    if (saved) {
+        try {
+            const state = JSON.parse(saved);
+            if (state.currentPath && state.currentPath !== "/") {
+                window.history.replaceState({}, '', state.currentPath);
+            }
+            if (typeof state.sidebarVisible === "boolean") {
+                const sidebar = document.getElementById("sidebar");
+                const container = document.querySelector(".container");
+                sidebar.classList.toggle("hidden", !state.sidebarVisible);
+                container.classList.toggle("sidebar-visible", state.sidebarVisible);
+            }
+        } catch (e) {
+            console.warn("Ошибка восстановления пути:", e);
+        }
+    }
+
     loadContent();
 
     document.getElementById("scroll-to-top").classList.add("hidden");
@@ -352,6 +406,8 @@ window.onload = function () {
         if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) loadMoreImages();
         document.getElementById("scroll-to-top").classList.toggle("hidden", window.scrollY <= 300);
     });
+
+    window.addEventListener("beforeunload", saveGalleryState);
 
     document.getElementById("gallery").addEventListener("mouseleave", hideTooltip);
     document.getElementById("gallery").addEventListener("mousemove", e => {
@@ -379,10 +435,8 @@ window.onload = function () {
     });
 
     document.getElementById("fullscreen-container").addEventListener("click", e => {
-        if (!e.target.closest(".fullscreen-image-wrapper") && !e.target.closest(".copy-btn") &&
-            !e.target.closest(".close-btn") && !e.target.closest(".nav-arrow")) {
-            closeFullscreen();
-        }
+        const isOutside = !e.target.closest(".fullscreen-image-wrapper") && !e.target.closest(".nav-arrow");
+        if (isOutside) closeFullscreen();
     });
 
     updateToggleButtonPosition();
@@ -392,4 +446,5 @@ window.onpopstate = () => {
     loadContent();
     loadCheckboxState();
     document.getElementById("scroll-to-top").classList.add("hidden");
+    updateCurrentFolderDisplay();
 };

@@ -45,22 +45,26 @@
         </button>
 
         <!-- Search and Sort -->
-        <div class="search-sort-container">
-            <div class="search-container">
-                <input type="text" id="search-box" placeholder="Фильтр по промпту..." oninput="filterImages()">
+        <div class="search-sort-bar">
+            <div class="search-sort-left"></div>
+            <div class="search-sort-center">
+                <div class="search-container">
+                    <input type="text" id="search-box" placeholder="Фильтр по промпту..." oninput="filterImages()">
+                </div>
+                <div class="sort-container">
+                    <select id="sort-select" onchange="changeSort()">
+                        <option value="date-asc">Дата ↑</option>
+                        <option value="date-desc">Дата ↓</option>
+                        <option value="filename-asc">Имя ↑</option>
+                        <option value="filename-desc">Имя ↓</option>
+                        <option value="prompt-asc">Промпт ↑</option>
+                        <option value="prompt-desc">Промпт ↓</option>
+                        <option value="rating-asc">Рейтинг ↑</option>
+                        <option value="rating-desc">Рейтинг ↓</option>
+                    </select>
+                </div>
             </div>
-            <div class="sort-container">
-                <select id="sort-select" onchange="changeSort()">
-                    <option value="date-asc">Дата ↑</option>
-                    <option value="date-desc">Дата ↓</option>
-                    <option value="filename-asc">Имя ↑</option>
-                    <option value="filename-desc">Имя ↓</option>
-                    <option value="prompt-asc">Промпт ↑</option>
-                    <option value="prompt-desc">Промпт ↓</option>
-                    <option value="rating-asc">Рейтинг ↑</option>
-                    <option value="rating-desc">Рейтинг ↓</option>
-                </select>
-            </div>
+            <div id="current-folder" class="current-folder"></div>
         </div>
 
         <!-- Scroll to top button -->

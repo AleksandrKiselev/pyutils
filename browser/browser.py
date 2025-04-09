@@ -176,18 +176,8 @@ def build_folder_tree(base_path, relative=""):
 @app.route("/<path:subpath>")
 def index(subpath=""):
     folder_path = os.path.abspath(os.path.join(IMAGE_FOLDER, subpath))
-
-    # Если корень — найти первую папку и редирект
-    if subpath == "":
-        for root, dirs, _ in os.walk(IMAGE_FOLDER):
-            if dirs:
-                first_folder = os.path.relpath(os.path.join(root, dirs[0]), IMAGE_FOLDER).replace("\\", "/")
-                return redirect(f"/{first_folder}")
-            break
-
     if not os.path.isdir(folder_path):
         return jsonify({"error": "Path not exist"}), 404
-
     return render_template("index.html",
                            folder_tree=build_folder_tree(IMAGE_FOLDER),
                            images_per_row=config["images_per_row"])
