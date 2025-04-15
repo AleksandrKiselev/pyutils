@@ -246,6 +246,38 @@ function updateFullscreenView() {
 
     document.getElementById('fullscreen-img').src = `/serve_image/${data.filename}`;
     document.getElementById('fullscreen-prompt').dataset.prompt = data.metadata.prompt;
+
+    const checkbox = document.getElementById('fullscreen-checkbox');
+    const miniCheckbox = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`);
+    const isChecked = miniCheckbox ? miniCheckbox.checked : !!data.metadata.checked;
+
+    checkbox.dataset.filename = data.filename;
+    checkbox.checked = isChecked;
+
+    const wrapper = document.querySelector(".fullscreen-image-wrapper");
+    wrapper.classList.toggle("checked", isChecked);
+
+    checkbox.onchange = function () {
+        const checked = checkbox.checked;
+        data.metadata.checked = checked;
+
+        wrapper.classList.toggle("checked", checked);
+
+        // синхронизация с миниатюрой
+        if (miniCheckbox) {
+            miniCheckbox.checked = checked;
+            const container = miniCheckbox.closest(".image-container");
+            if (container) {
+                container.classList.toggle("checked", checked);
+            }
+        }
+
+        fetch("/update_metadata", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ filename: data.filename, checked })
+        }).catch(console.error);
+    };
 }
 
 function prevImage() {
@@ -274,6 +306,40 @@ function copyPromptFullscreen() {
     if (prompt) navigator.clipboard.writeText(prompt);
 }
 
+function deleteFullscreen() {
+    const data = currentImages[currentIndex];
+    if (!data || !confirm("Удалить изображение?")) return;
+
+    fetch("/delete_image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: data.filename })
+    })
+    .then(res => res.json())
+    .then(async result => {
+        if (result.success) {
+            // Удаляем миниатюру
+            const thumb = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`)?.closest(".image-container");
+            if (thumb) thumb.remove();
+
+            // Удаляем из массива
+            currentImages.splice(currentIndex, 1);
+
+            // Переход к следующему изображению или закрыть, если всё удалено
+            if (currentImages.length === 0) {
+                closeFullscreen();
+            } else if (currentIndex >= currentImages.length) {
+                currentIndex = currentImages.length - 1;
+                updateFullscreenView();
+            } else {
+                updateFullscreenView();
+            }
+        } else {
+            alert("Ошибка удаления: " + (result.error || "неизвестная"));
+        }
+    });
+}
+
 // --- Checkbox and Rating ---
 function saveCheckboxState(event) {
     const cb = event.target;
@@ -294,7 +360,10 @@ function loadCheckboxState() {
 
 function updateImageOpacity() {
     document.querySelectorAll(".image-checkbox").forEach(cb => {
-        cb.closest(".image-container").classList.toggle("checked", cb.checked);
+        const container = cb.closest(".image-container");
+        if (container) {
+            container.classList.toggle("checked", cb.checked);
+        }
     });
 }
 

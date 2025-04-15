@@ -387,6 +387,29 @@ body {
     right: 10px;
 }
 
+/* Fullscreen buttons (reuse .image-buttons style) */
+.fullscreen-buttons {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    gap: 4px;
+    background: var(--hover-bg);
+    padding: 4px;
+    border-radius: 6px;
+    opacity: 0.8;
+    z-index: 1010;
+}
+
+.fullscreen-buttons:hover {
+    opacity: 1;
+}
+
+.fullscreen-image-wrapper.checked img {
+    filter: grayscale(50%) brightness(80%);
+    transition: filter 0.3s ease-in-out;
+}
+
 /* ==========================
    ⏳ Loading
 ========================== */
