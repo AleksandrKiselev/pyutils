@@ -231,19 +231,20 @@ def delete_image():
 @app.route("/update_metadata", methods=["POST"])
 def update_metadata():
     data = request.get_json()
-    filename = data.get("filename")
-    if not filename:
-        return jsonify({"error": "Invalid request"}), 400
+    filenames = data.get("filenames") or [data.get("filename")]
+    if not filenames or not isinstance(filenames, list):
+        return jsonify({"error": "No filenames provided"}), 400
 
-    image_path = os.path.join(IMAGE_FOLDER, filename)
-    if not os.path.exists(image_path):
-        return jsonify({"error": "File not found"}), 404
+    for filename in filenames:
+        image_path = os.path.join(IMAGE_FOLDER, filename)
+        if not os.path.exists(image_path):
+            continue
+        metadata = load_metadata(image_path)
+        for key in ("checked", "rating"):
+            if key in data:
+                metadata[key] = data[key]
+        save_metadata(image_path, metadata)
 
-    metadata = load_metadata(image_path)
-    for key in ("checked", "rating"):
-        if key in data:
-            metadata[key] = data[key]
-    save_metadata(image_path, metadata)
     return jsonify({"success": True})
 
 # --- Startup ---

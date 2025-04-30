@@ -6,47 +6,11 @@
     <title>Image Viewer</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
-    <div class="container">
-        <!-- Sidebar -->
-        <aside id="sidebar" class="sidebar hidden">
-            <div class="sidebar-title">📂 Папки</div>
-            <div class="sidebar-folders">
-                {% macro render_tree(tree) %}
-                <ul class="folder-tree">
-                    {% for path, node in tree.items() %}
-                        <li class="folder-item{% if node.children %} has-children expanded{% endif %}">
-                            <div class="folder-row" data-has-children="{{ node.children is defined and node.children }}">
-                                {% if node.children %}
-                                    <span class="folder-toggle" onclick="toggleFolder(event)">⯈</span>
-                                {% else %}
-                                    <span class="folder-toggle-placeholder"></span>
-                                {% endif %}
-                                <a href="/{{ path }}" onclick="updateUrl(event, '{{ path }}')">
-                                    {{ node.name }} ({{ node.count }})
-                                </a>
-                            </div>
-                            {% if node.children %}
-                                <div class="folder-children">
-                                    {{ render_tree(node.children) }}
-                                </div>
-                            {% endif %}
-                        </li>
-                    {% endfor %}
-                </ul>
-                {% endmacro %}
-                {{ render_tree(folder_tree) }}
-            </div>
-        </aside>
-
-        <!-- Sidebar toggle -->
-        <button id="menu-toggle" class="menu-toggle">
-            <span id="menu-icon">⯈</span>
-        </button>
-
+<body class="sidebar-visible">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
         <!-- Search and Sort -->
         <div class="search-sort-bar">
-            <div class="search-sort-left"></div>
             <div class="search-sort-center">
                 <div class="search-container">
                     <input type="text" id="search-box" placeholder="Фильтр по промпту..." oninput="filterImages()">
@@ -63,9 +27,45 @@
                         <option value="rating-desc">Рейтинг ↓</option>
                     </select>
                 </div>
+                <div class="reset-and-folder">
+                    <button onclick="uncheckAllCheckboxes()" class="reset-checkboxes-btn">Reset✅</button>
+                </div>
             </div>
-            <div id="current-folder" class="current-folder"></div>
         </div>
+        <div class="sidebar-folders">
+            {% macro render_tree(tree) %}
+            <ul class="folder-tree">
+                {% for path, node in tree.items() %}
+                    <li class="folder-item{% if node.children %} has-children expanded{% endif %}">
+                        <div class="folder-row" data-has-children="{{ node.children is defined and node.children }}">
+                            {% if node.children %}
+                                <span class="folder-toggle" onclick="toggleFolder(event)">⯈</span>
+                            {% else %}
+                                <span class="folder-toggle-placeholder"></span>
+                            {% endif %}
+                            <a href="/{{ path }}" onclick="updateUrl(event, '{{ path }}')">
+                                {{ node.name }} ({{ node.count }})
+                            </a>
+                        </div>
+                        {% if node.children %}
+                            <div class="folder-children">
+                                {{ render_tree(node.children) }}
+                            </div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+            {% endmacro %}
+            {{ render_tree(folder_tree) }}
+        </div>
+    </aside>
+
+    <!-- Основной контент -->
+    <div class="container">
+        <!-- Sidebar toggle -->
+        <button id="menu-toggle" class="menu-toggle">
+            <span id="menu-icon">⯇</span>
+        </button>
 
         <!-- Scroll to top button -->
         <div id="scroll-buttons">
@@ -100,6 +100,7 @@
     <!-- JavaScript Constants -->
     <script>
         const IMAGES_PER_ROW = {{ images_per_row }};
+        const FOLDER_TREE = {{ folder_tree|tojson }};
     </script>
     <script src="/static/script.js"></script>
 </body>

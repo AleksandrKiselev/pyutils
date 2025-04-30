@@ -9,6 +9,7 @@ let searchQuery = "";
 let tooltipTimeout;
 let sortBy = "date-asc";
 
+
 // --- Load Content ---
 async function updateUrl(event, path) {
     event.preventDefault();
@@ -25,7 +26,6 @@ async function loadContent() {
     const path = window.location.pathname;
     restoreGalleryState();
     await (path === "/" ? loadFolders() : loadImages());
-    updateCurrentFolderDisplay();
     document.getElementById('loading').style.display = 'none';
 }
 
@@ -60,12 +60,29 @@ function updateActiveFolderHighlight() {
     }
 }
 
-function updateCurrentFolderDisplay() {
-    const currentPath = window.location.pathname.replace(/^\/+/, "");
-    const label = currentPath || "(корень)";
-    document.getElementById("current-folder").textContent = `📁 ${label}`;
-}
+function findFolderNode(path) {
+    const parts = path.split("/").filter(Boolean);
+    let fullPath = "";
+    let node = FOLDER_TREE;
 
+    for (let i = 0; i < parts.length; i++) {
+        fullPath = fullPath ? `${fullPath}/${parts[i]}` : parts[i];
+
+        const parent = node[fullPath];
+        if (!parent) return null;
+
+        // Если это последний элемент — вернём его
+        if (i === parts.length - 1) {
+            return parent;
+        }
+
+        // Иначе спускаемся глубже
+        node = parent.children;
+        if (!node || typeof node !== "object") return null;
+    }
+
+    return null;
+}
 
 // --- Image Gallery ---
 async function loadImages() {
@@ -172,6 +189,29 @@ function restoreGalleryState() {
 
 function scrollToTop() {
     window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function uncheckAllCheckboxes() {
+    const checkboxes = document.querySelectorAll(".image-checkbox:checked");
+    if (!checkboxes.length) return;
+
+    const filenames = [];
+    checkboxes.forEach(cb => {
+        cb.checked = false;
+        filenames.push(cb.dataset.filename);
+
+        const container = cb.closest(".image-container");
+        if (container) container.classList.remove("checked");
+
+        const img = currentImages.find(i => i.filename === cb.dataset.filename);
+        if (img) img.metadata.checked = false;
+    });
+
+    fetch("/update_metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filenames, checked: false })
+    }).catch(console.error);
 }
 
 
@@ -306,6 +346,13 @@ function copyPromptFullscreen() {
     if (prompt) navigator.clipboard.writeText(prompt);
 }
 
+function rebindFullscreenIndices() {
+    const containers = document.querySelectorAll("#gallery .image-container");
+    containers.forEach((container, i) => {
+        container.setAttribute("onclick", `openFullscreen(${i})`);
+    });
+}
+
 function deleteFullscreen() {
     const data = currentImages[currentIndex];
     if (!data || !confirm("Удалить изображение?")) return;
@@ -324,6 +371,7 @@ function deleteFullscreen() {
 
             // Удаляем из массива
             currentImages.splice(currentIndex, 1);
+            rebindFullscreenIndices();
 
             // Переход к следующему изображению или закрыть, если всё удалено
             if (currentImages.length === 0) {
@@ -428,12 +476,12 @@ function toggleFolder(event) {
 }
 
 function updateToggleButtonPosition() {
-    const sidebar = document.getElementById("sidebar");
-    const toggleBtn = document.getElementById("menu-toggle");
+    const btn = document.getElementById("menu-toggle");
     const icon = document.getElementById("menu-icon");
 
-    toggleBtn.style.left = sidebar.classList.contains("hidden") ? "10px" : `${sidebar.offsetWidth + 10}px`;
-    icon.textContent = sidebar.classList.contains("hidden") ? "⯈" : "⯇";
+    const isVisible = document.body.classList.contains("sidebar-visible");
+    btn.style.left = isVisible ? "200px" : "10px";
+    icon.textContent = isVisible ? "⯇" : "⯈";
 }
 
 // --- Init ---
@@ -459,9 +507,9 @@ window.onload = function () {
     loadContent();
 
     document.getElementById("scroll-to-top").classList.add("hidden");
+
     document.getElementById("menu-toggle").addEventListener("click", () => {
-        document.getElementById("sidebar").classList.toggle("hidden");
-        document.querySelector(".container").classList.toggle("sidebar-visible");
+        document.body.classList.toggle("sidebar-visible");
         updateToggleButtonPosition();
     });
 
@@ -491,15 +539,15 @@ window.onload = function () {
     });
 
     document.addEventListener("keydown", e => {
-        if (document.getElementById("fullscreen-container").style.display === "flex") {
+        const isFullscreen = document.getElementById("fullscreen-container").style.display === "flex";
+        if (isFullscreen) {
             if (e.key === "ArrowLeft") prevImage();
             if (e.key === "ArrowRight") nextImage();
             if (e.key === "Escape") closeFullscreen();
+            if (e.key === "Delete") deleteFullscreen();
         }
         if (e.ctrlKey && (e.key.toLowerCase() === "c" || e.key.toLowerCase() === "с")) {
-            document.getElementById("fullscreen-container").style.display === "flex"
-                ? copyPromptFullscreen()
-                : copyTooltipText();
+            isFullscreen ? copyPromptFullscreen() : copyTooltipText();
         }
     });
 
@@ -515,5 +563,4 @@ window.onpopstate = () => {
     loadContent();
     loadCheckboxState();
     document.getElementById("scroll-to-top").classList.add("hidden");
-    updateCurrentFolderDisplay();
 };
