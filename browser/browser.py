@@ -39,8 +39,16 @@ IMAGE_FOLDER = os.path.abspath(config["image_folder"])
 def get_relative_path(path):
     return path.replace(IMAGE_FOLDER, "").lstrip(os.sep).replace("\\", "/")
 
+def get_metadata_file_path(image_path, ext):
+    folder = os.path.dirname(image_path)
+    meta_dir = os.path.join(folder, ".metadata")
+    os.makedirs(meta_dir, exist_ok=True)
+    base = os.path.splitext(os.path.basename(image_path))[0]
+    return os.path.join(meta_dir, base + ext)
+
 def get_metadata_path(image_path):
-    return os.path.splitext(image_path)[0] + ".json"
+    return get_metadata_file_path(image_path, ".json")
+
 
 def extract_prompt_from_png(image_path):
     try:
@@ -113,6 +121,7 @@ def create_thumbnail(image_path, thumb_path):
         try:
             with Image.open(image_path) as img:
                 img.thumbnail((config["thumbnail_size"], config["thumbnail_size"]))
+                os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
                 img.save(thumb_path, "WEBP")
                 return
         except (OSError, UnidentifiedImageError):
@@ -122,7 +131,7 @@ def create_thumbnail(image_path, thumb_path):
 
 def process_image(image_path):
     metadata = load_metadata(image_path)
-    thumb_path = os.path.splitext(image_path)[0] + ".webp"
+    thumb_path = get_metadata_file_path(image_path, ".webp")
 
     if not os.path.exists(thumb_path) or os.path.getmtime(image_path) > os.path.getmtime(thumb_path):
         create_thumbnail(image_path, thumb_path)
@@ -216,8 +225,8 @@ def delete_image():
         return jsonify({"error": "Filename is required"}), 400
 
     base = os.path.join(IMAGE_FOLDER, filename)
-    thumb = base.replace(".png", ".webp")
-    meta = base.replace(".png", ".json")
+    thumb = get_metadata_file_path(base, ".webp")
+    meta = get_metadata_file_path(base, ".json")
 
     try:
         os.remove(base)
@@ -246,6 +255,31 @@ def update_metadata():
         save_metadata(image_path, metadata)
 
     return jsonify({"success": True})
+
+@app.route("/copy_to_favorites", methods=["POST"])
+def copy_to_favorites():
+    data = request.get_json()
+    filename = data.get("filename")
+    if not filename:
+        return jsonify({"error": "Filename is required"}), 400
+
+    src = os.path.join(IMAGE_FOLDER, filename)
+    dst_dir = config.get("favorites_folder")
+    if not dst_dir:
+        return jsonify({"error": "No favorites_folder defined in config"}), 500
+
+    dst = os.path.join(dst_dir, os.path.basename(filename))
+    os.makedirs(dst_dir, exist_ok=True)
+
+    try:
+        if os.path.abspath(src) == os.path.abspath(dst):
+            return jsonify({"error": "Source and destination are the same"}), 400
+        with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+            fdst.write(fsrc.read())
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # --- Startup ---
 def open_browser():

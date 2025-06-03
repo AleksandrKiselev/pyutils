@@ -3,8 +3,8 @@ import json
 import re
 
 # Путь к папке с JSON-файлами
-folder_path = "d:\\AI-Software\\configs\\browser\\static\\images\\char"
-output_txt = "D:\\AI-Software\\configs\\wildcards\\char.txt"
+folder_path = "d:\\AI-Software\\configs\\browser\\static\\images\\char\\.metadata"
+output_txt = "D:\\AI-Software\\configs\\wildcards\\char\\char.txt"
 
 prompts = []
 
@@ -15,7 +15,7 @@ files = [
 ]
 
 # Сортируем по времени создания
-files.sort(key=lambda x: x[1])
+files.sort(key=lambda x: x[1], reverse=True)
 
 # Обрабатываем файлы в порядке времени создания
 for file_path, _ in files:
@@ -30,6 +30,8 @@ for file_path, _ in files:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
     prompts.append(prompt)
+
+os.makedirs(os.path.dirname(output_txt), exist_ok=True)
 
 # Сохраняем все prompt в текстовый файл
 with open(output_txt, "w", encoding="utf-8") as f:

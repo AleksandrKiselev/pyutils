@@ -58,6 +58,7 @@
             {% endmacro %}
             {{ render_tree(folder_tree) }}
         </div>
+        <div class="sidebar-folders-bottom-spacer"></div>
     </aside>
 
     <!-- Основной контент -->
@@ -87,6 +88,7 @@
         <div class="fullscreen-image-wrapper">
             <div class="image-buttons fullscreen-buttons">
                 <button class="copy-btn" onclick="copyPromptFullscreen()">📋</button>
+                <button class="copy-favorites-btn" onclick="copyToFavoritesFullscreen()">⭐</button>
                 <input type="checkbox" id="fullscreen-checkbox" class="image-checkbox">
                 <button class="delete-btn" onclick="deleteFullscreen()">❌</button>
             </div>

@@ -118,6 +118,7 @@ function renderImageCards(images) {
              onmouseenter="showStars(event)" onmouseleave="hideStars(event)">
             <div class="image-buttons">
                 <button class="copy-btn" onclick="copyToClipboard(event, '${escapeJS(img.metadata.prompt)}')">📋</button>
+                <button class="copy-favorites-btn" onclick="copyToFavorites(event, '${img.filename}')">⭐</button>
                 <input type="checkbox" class="image-checkbox" data-filename="${img.filename}"
                        onclick="event.stopPropagation(); saveCheckboxState(event);">
                 <button class="delete-btn" onclick="deleteThumbnail(event, '${img.filename}')">❌</button>
@@ -461,6 +462,34 @@ async function deleteThumbnail(event, filename) {
     }
 }
 
+// --- Copy To Favorites ---
+function copyToFavorites(event, filename) {
+    event.stopPropagation();
+    fetch("/copy_to_favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            console.log(`✅ Скопировано в "favorites": ${filename}`);
+        } else {
+            alert("Ошибка копирования: " + (result.error || "неизвестная"));
+        }
+    })
+    .catch(err => {
+        alert("Ошибка соединения: " + err);
+    });
+}
+
+function copyToFavoritesFullscreen() {
+    const data = currentImages[currentIndex];
+    if (!data) return;
+    copyToFavorites({ stopPropagation: () => {} }, data.filename);
+}
+
+
 // --- UI Events ---
 function changeSort() {
     sortBy = document.getElementById("sort-select").value;
@@ -480,7 +509,7 @@ function updateToggleButtonPosition() {
     const icon = document.getElementById("menu-icon");
 
     const isVisible = document.body.classList.contains("sidebar-visible");
-    btn.style.left = isVisible ? "200px" : "10px";
+    btn.style.left = isVisible ? "220px" : "10px";
     icon.textContent = isVisible ? "⯇" : "⯈";
 }
 
