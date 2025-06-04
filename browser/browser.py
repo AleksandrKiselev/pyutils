@@ -103,6 +103,9 @@ def load_metadata(image_path):
     if "rating" not in metadata:
         metadata["rating"] = 0
         modified = True
+    if "tags" not in metadata:
+        metadata["tags"] = []
+        modified = True
 
     if modified:
         save_metadata(image_path, metadata)
@@ -153,6 +156,7 @@ def get_sorted_images(folder, sort_by="date", order="asc"):
         "filename": lambda img: img["filename"].lower(),
         "prompt": lambda img: img["metadata"].get("prompt", "").lower(),
         "rating": lambda img: img["metadata"].get("rating", 0),
+        "tags": lambda img: ", ".join(img["metadata"].get("tags", [])).lower()
     }
 
     if sort_by in key_funcs:
@@ -205,7 +209,19 @@ def get_images(subpath=""):
 
     images = get_sorted_images(folder_path, sort_by, order)
     if search:
-        images = [img for img in images if search in img["metadata"].get("prompt", "").lower()]
+        if search.startswith("tags:"):
+            raw = search[5:].strip().lower()
+            if not raw:
+                # Поиск изображений без тегов
+                images = [img for img in images if not img["metadata"].get("tags")]
+            else:
+                tags = [t.strip() for t in raw.split(",") if t]
+                images = [
+                    img for img in images
+                    if all(t in [tag.lower() for tag in img["metadata"].get("tags", [])] for t in tags)
+                ]
+        else:
+            images = [img for img in images if search in img["metadata"].get("prompt", "").lower()]
 
     return jsonify(images[offset:offset + limit])
 
@@ -249,7 +265,7 @@ def update_metadata():
         if not os.path.exists(image_path):
             continue
         metadata = load_metadata(image_path)
-        for key in ("checked", "rating"):
+        for key in ("checked", "rating", "tags"):
             if key in data:
                 metadata[key] = data[key]
         save_metadata(image_path, metadata)

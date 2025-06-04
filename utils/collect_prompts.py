@@ -3,8 +3,8 @@ import json
 import re
 
 # Путь к папке с JSON-файлами
-folder_path = "d:\\AI-Software\\configs\\browser\\static\\images\\char\\.metadata"
-output_txt = "D:\\AI-Software\\configs\\wildcards\\char\\char.txt"
+folder_path = "d:\\AI-Software\\configs\\browser\\static\\images\\model\\4thTail\\styles\\.metadata"
+output_txt = "D:\\AI-Software\\configs\\wildcards\\style\\4thTail_best.txt"
 
 prompts = []
 

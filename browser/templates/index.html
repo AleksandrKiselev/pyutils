@@ -13,7 +13,7 @@
         <div class="search-sort-bar">
             <div class="search-sort-center">
                 <div class="search-container">
-                    <input type="text" id="search-box" placeholder="Фильтр по промпту..." oninput="filterImages()">
+                    <input type="text" id="search-box" placeholder="prompt или tags:tag1,tag2,..." oninput="filterImages()">
                 </div>
                 <div class="sort-container">
                     <select id="sort-select" onchange="changeSort()">
@@ -25,6 +25,8 @@
                         <option value="prompt-desc">Промпт ↓</option>
                         <option value="rating-asc">Рейтинг ↑</option>
                         <option value="rating-desc">Рейтинг ↓</option>
+                        <option value="tags-asc">Теги ↑</option>
+                        <option value="tags-desc">Теги ↓</option>
                     </select>
                 </div>
                 <div class="reset-and-folder">
@@ -94,6 +96,13 @@
             </div>
             <img id="fullscreen-img" src="" alt="Fullscreen Image">
             <div id="fullscreen-prompt" data-prompt=""></div>
+            <div class="fullscreen-tags-overlay">
+                <div id="fullscreen-tags-wrapper">
+                    <input id="fullscreen-tags" placeholder="теги, через запятую... (Enter)">
+                </div>
+                <div id="tags-saved-indicator" class="tags-saved-indicator hidden">✅ Сохранено</div>
+                <div id="fullscreen-tags-display" class="tag-pill-container"></div>
+            </div>
         </div>
         <button class="nav-arrow nav-left" onclick="prevImage()">◀</button>
         <button class="nav-arrow nav-right" onclick="nextImage()">▶</button>

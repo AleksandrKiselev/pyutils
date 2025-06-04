@@ -113,29 +113,33 @@ async function loadMoreImages(limit = LIMIT) {
 }
 
 function renderImageCards(images) {
-    return images.map((img, index) => `
-        <div class="image-container" onclick="openFullscreen(${offset + index})"
-             onmouseenter="showStars(event)" onmouseleave="hideStars(event)">
-            <div class="image-buttons">
-                <button class="copy-btn" onclick="copyToClipboard(event, '${escapeJS(img.metadata.prompt)}')">📋</button>
-                <button class="copy-favorites-btn" onclick="copyToFavorites(event, '${img.filename}')">⭐</button>
-                <input type="checkbox" class="image-checkbox" data-filename="${img.filename}"
-                       onclick="event.stopPropagation(); saveCheckboxState(event);">
-                <button class="delete-btn" onclick="deleteThumbnail(event, '${img.filename}')">❌</button>
-            </div>
-            <div class="image-rating" style="opacity: 0;">
-                ${[1,2,3,4,5].map(star => `
-                    <span class="star" data-filename="${img.filename}" data-rating="${star}"
-                          onclick="setRating(event, '${img.filename}', ${star})">
-                        ${img.metadata.rating >= star ? "★" : "☆"}
-                    </span>`).join('')}
-            </div>
-            <img src="/serve_thumbnail/${img.thumbnail}" alt="Image" loading="lazy"
-                 onmouseenter="showTooltip(event, '${escapeJS(img.metadata.prompt)}')"
-                 onmousemove="updateTooltipPosition(event)"
-                 onmouseleave="hideTooltip()">
-        </div>
-    `).join('');
+    return images.map((img, index) => {
+        const prompt = escapeJS(img.metadata.prompt);
+        const tagsJson = JSON.stringify(img.metadata.tags || []).replace(/"/g, '&quot;');
+
+        return `
+            <div class="image-container" onclick="openFullscreen(${offset + index})"
+                 onmouseenter="showStars(event)" onmouseleave="hideStars(event)">
+                <div class="image-buttons">
+                    <button class="copy-btn" onclick="copyToClipboard(event, '${prompt}')">📋</button>
+                    <button class="copy-favorites-btn" onclick="copyToFavorites(event, '${img.filename}')">⭐</button>
+                    <input type="checkbox" class="image-checkbox" data-filename="${img.filename}"
+                           onclick="event.stopPropagation(); saveCheckboxState(event);">
+                    <button class="delete-btn" onclick="deleteThumbnail(event, '${img.filename}')">❌</button>
+                </div>
+                <div class="image-rating" style="opacity: 0;">
+                    ${[1,2,3,4,5].map(star => `
+                        <span class="star" data-filename="${img.filename}" data-rating="${star}"
+                              onclick="setRating(event, '${img.filename}', ${star})">
+                            ${img.metadata.rating >= star ? "★" : "☆"}
+                        </span>`).join('')}
+                </div>
+                <img src="/serve_thumbnail/${img.thumbnail}" alt="Image" loading="lazy"
+                     onmouseenter="showTooltip(event, '${prompt}', ${tagsJson})"
+                     onmousemove="updateTooltipPosition(event)"
+                     onmouseleave="hideTooltip()">
+            </div>`;
+        }).join('');
 }
 
 function filterImages() {
@@ -227,9 +231,19 @@ function escapeJS(str) {
     return str.replace(/'/g, "\\'");
 }
 
-function showTooltip(event, text) {
+function showTooltip(event, text, tags = []) {
     clearTimeout(tooltipTimeout);
-    tooltip.innerHTML = `<div class="tooltip-text">${escapeHTML(text)}</div><div class="tooltip-hint">CTRL+C</div>`;
+
+    if (tags.length) {
+        const pillsHTML = `<div class="tooltip-tags">${tags.map(tag =>
+            `<span class="tag-pill tooltip-pill">${escapeHTML(tag)}</span>`).join("")}</div>`;
+
+        tooltip.innerHTML = `<div class="tooltip-text">${escapeHTML(text)}</div>${pillsHTML}<div class="tooltip-hint">CTRL+C</div>`;
+    } else {
+        tooltip.innerHTML = `<div class="tooltip-text">${escapeHTML(text)}</div><div class="tooltip-hint">CTRL+C</div>`;
+    }
+
+
     tooltip.style.display = "block";
     tooltip.classList.add("visible");
     updateTooltipPosition(event);
@@ -251,12 +265,12 @@ function updateTooltipPosition(event) {
 
 function hideTooltip(event) {
     if (!event?.relatedTarget || !event.relatedTarget.closest("#gallery")) {
-        clearTimeout(tooltipTimeout);
-        tooltipTimeout = setTimeout(() => {
-            tooltip.classList.remove("visible");
-            setTimeout(() => tooltip.style.display = "none", 100);
-        }, 200);
-    }
+    clearTimeout(tooltipTimeout);
+    tooltipTimeout = setTimeout(() => {
+        tooltip.classList.remove("visible");
+        setTimeout(() => tooltip.style.display = "none", 100);
+    }, 200);
+}
 }
 
 function copyTooltipText() {
@@ -297,6 +311,12 @@ function updateFullscreenView() {
 
     const wrapper = document.querySelector(".fullscreen-image-wrapper");
     wrapper.classList.toggle("checked", isChecked);
+
+    const tagInput = document.getElementById("fullscreen-tags");
+    tagInput.value = (data.metadata.tags || []).join(", ");
+    const display = document.getElementById("fullscreen-tags-display");
+    display.innerHTML = "";
+    renderFullscreenTagPills(data.metadata.tags || []);
 
     checkbox.onchange = function () {
         const checked = checkbox.checked;
@@ -444,6 +464,66 @@ function hideStars(event) {
     event.currentTarget.querySelector(".image-rating").style.opacity = "0";
 }
 
+// --- Tags ---
+function renderFullscreenTagPills(tags) {
+    const display = document.getElementById("fullscreen-tags-display");
+    display.innerHTML = "";
+
+    tags.forEach(tag => {
+        const span = document.createElement("span");
+        span.className = "tag-pill";
+        span.textContent = tag;
+        span.onclick = () => {
+            document.getElementById("search-box").value = "tags:" + tag;
+            filterImages();
+            closeFullscreen();
+        };
+        display.appendChild(span);
+    });
+}
+
+
+function saveTags() {
+    const input = document.getElementById("fullscreen-tags");
+    const tags = input.value.split(",").map(t => t.trim()).filter(Boolean);
+    const data = currentImages[currentIndex];
+    if (!data) return;
+
+    data.metadata.tags = tags;
+    const container = document.querySelector(`.image-container [data-filename="${data.filename}"]`)?.closest(".image-container");
+    if (container) {
+        const imgEl = container.querySelector("img");
+        if (imgEl) {
+            const prompt = escapeJS(data.metadata.prompt);
+            const tagsJson = JSON.stringify(tags)
+                .replace(/\\/g, "\\\\")
+                .replace(/'/g, "\\'");
+            imgEl.setAttribute("onmouseenter", `showTooltip(event, '${prompt}', ${tagsJson})`);
+        }
+    }
+
+    fetch("/update_metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: data.filename, tags })
+    }).then(() => {
+        console.log("✅ Теги обновлены:", tags);
+    }).catch(console.error);
+
+    renderFullscreenTagPills(tags);
+
+    const indicator = document.getElementById("tags-saved-indicator");
+    if (indicator) {
+        indicator.classList.remove("hidden");
+        indicator.classList.add("visible");
+        setTimeout(() => {
+            indicator.classList.remove("visible");
+            indicator.classList.add("hidden");
+        }, 1000);
+    }
+}
+
+
 // --- Deletion ---
 async function deleteThumbnail(event, filename) {
     event.stopPropagation();
@@ -574,6 +654,12 @@ window.onload = function () {
             if (e.key === "ArrowRight") nextImage();
             if (e.key === "Escape") closeFullscreen();
             if (e.key === "Delete") deleteFullscreen();
+
+            const tagInput = document.getElementById("fullscreen-tags");
+            if (e.key === "Enter" && document.activeElement === tagInput) {
+                e.preventDefault();
+                saveTags();
+            }
         }
         if (e.ctrlKey && (e.key.toLowerCase() === "c" || e.key.toLowerCase() === "с")) {
             isFullscreen ? copyPromptFullscreen() : copyTooltipText();
