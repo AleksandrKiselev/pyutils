@@ -65,5 +65,5 @@ def process_file(path, similarity_threshold, sort=False, add_empty_lines=True, a
             f.write('\n'.join(formatted_lines))
 
 
-file_path = r'D:\AI-Software\configs\wildcards\style\4thTail_best.txt'
-process_file(file_path, similarity_threshold=100, sort=True, add_empty_lines=False, apply_mixed_case_conversion=False)
+file_path = r'D:\AI-Software\configs\wildcards\nsfw\nsfw.txt'
+process_file(file_path, similarity_threshold=95, sort=False, add_empty_lines=False, apply_mixed_case_conversion=False)

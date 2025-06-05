@@ -403,6 +403,33 @@ body.sidebar-visible .fullscreen-img .fullscreen-image-wrapper {
     border-radius: 2px;
 }
 
+#fullscreen-prompt {
+    position: absolute;
+    top: 60px;
+    left: 20px;
+    right: 20px;
+    max-height: 30%;
+    padding: 10px 14px;
+    background-color: rgba(20, 20, 20, 0.08);  /* тусклый obsidian фон */
+    color: rgba(180, 180, 180, 0.15);          /* очень тусклый текст */
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.4;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    border-radius: 6px;
+    pointer-events: auto;
+    opacity: 0.2;
+    transition: opacity 0.25s ease, background-color 0.25s ease, color 0.25s ease;
+    z-index: 10;
+}
+
+#fullscreen-prompt:hover {
+    background-color: rgba(20, 20, 20, 0.9);   /* насыщеннее при наведении */
+    color: rgba(220, 220, 220, 0.95);          /* чёткий, но мягкий белый */
+    opacity: 0.8;
+}
+
 /* Arrows */
 .nav-arrow {
     position: absolute;
@@ -467,12 +494,13 @@ body.sidebar-visible .nav-left {
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
+    position: relative;
 }
 
 #fullscreen-tags {
     flex: 1 1 auto;
-    min-width: 200px;
-    max-width: 400px;
+    min-width: 600px;
+    max-width: 800px;
     font-size: 13px;
     padding: 6px 10px;
     border-radius: 4px;
@@ -559,6 +587,38 @@ body.sidebar-visible .nav-left {
 .tags-saved-indicator.hidden {
     display: none;
 }
+
+.tag-suggestion-container {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    max-height: 150px;
+    overflow-y: auto;
+    width: 100%;
+    z-index: 2000;
+    box-shadow: 0 0 6px rgba(0,0,0,0.4);
+    margin-bottom: 4px;
+}
+
+.tag-suggestion {
+    padding: 6px 10px;
+    cursor: pointer;
+    color: var(--text-color);
+    font-size: 13px;
+}
+
+.tag-suggestion:hover {
+    background-color: var(--hover-bg);
+}
+
+.tag-suggestion.active {
+    background-color: rgba(255, 152, 0, 0.15);
+}
+
+
 
 
 /* ==========================

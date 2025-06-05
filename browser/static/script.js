@@ -8,6 +8,8 @@ let currentIndex = 0;
 let searchQuery = "";
 let tooltipTimeout;
 let sortBy = "date-asc";
+let allTags = [];
+let suggestionIndex = -1;
 
 
 // --- Load Content ---
@@ -27,6 +29,7 @@ async function loadContent() {
     restoreGalleryState();
     await (path === "/" ? loadFolders() : loadImages());
     document.getElementById('loading').style.display = 'none';
+    fetchAllTags()
 }
 
 async function loadFolders() {
@@ -289,6 +292,8 @@ function openFullscreen(index) {
     currentIndex = index;
     updateFullscreenView();
     document.getElementById('fullscreen-container').style.display = 'flex';
+    const tagInput = document.getElementById("fullscreen-tags");
+    tagInput.focus();
 }
 
 function closeFullscreen() {
@@ -300,7 +305,10 @@ function updateFullscreenView() {
     if (!data) return;
 
     document.getElementById('fullscreen-img').src = `/serve_image/${data.filename}`;
-    document.getElementById('fullscreen-prompt').dataset.prompt = data.metadata.prompt;
+
+    const promptEl = document.getElementById('fullscreen-prompt');
+    promptEl.dataset.prompt = data.metadata.prompt;
+    promptEl.textContent = data.metadata.prompt || "";
 
     const checkbox = document.getElementById('fullscreen-checkbox');
     const miniCheckbox = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`);
@@ -482,7 +490,6 @@ function renderFullscreenTagPills(tags) {
     });
 }
 
-
 function saveTags() {
     const input = document.getElementById("fullscreen-tags");
     const tags = input.value.split(",").map(t => t.trim()).filter(Boolean);
@@ -497,10 +504,19 @@ function saveTags() {
             const prompt = escapeJS(data.metadata.prompt);
             const tagsJson = JSON.stringify(tags)
                 .replace(/\\/g, "\\\\")
-                .replace(/'/g, "\\'");
+                .replace(/'/g, "\\'")
+                .replace(/</g, "\\u003c")
+                .replace(/>/g, "\\u003e");
             imgEl.setAttribute("onmouseenter", `showTooltip(event, '${prompt}', ${tagsJson})`);
         }
     }
+
+    // Обновим allTags, если были новые
+    tags.forEach(tag => {
+        if (!allTags.includes(tag)) {
+            allTags.push(tag);
+        }
+    });
 
     fetch("/update_metadata", {
         method: "POST",
@@ -521,6 +537,87 @@ function saveTags() {
             indicator.classList.add("hidden");
         }, 1000);
     }
+
+    input.focus();
+}
+
+async function fetchAllTags() {
+    try {
+        const res = await fetch('/all_tags');
+        allTags = await res.json();
+    } catch (err) {
+        console.error("Ошибка загрузки тегов:", err);
+    }
+}
+
+const tagsInput = document.getElementById("fullscreen-tags");
+
+tagsInput.addEventListener("input", () => {
+    const value = tagsInput.value.split(",").pop().trim().toLowerCase();
+    closeTagSuggestions();
+
+    if (!value) return;
+
+    const suggestions = allTags.filter(tag => tag.toLowerCase().startsWith(value)).slice(0, 10);
+
+    const container = document.createElement("div");
+    container.className = "tag-suggestion-container";
+
+    suggestions.forEach(tag => {
+        const div = document.createElement("div");
+        div.className = "tag-suggestion";
+        div.innerHTML = `<strong>${tag.slice(0, value.length)}</strong>${tag.slice(value.length)}`;
+        div.onclick = () => {
+            const parts = tagsInput.value.split(",");
+            parts[parts.length - 1] = tag;
+            tagsInput.value = parts.join(", ") + ", ";
+            closeTagSuggestions();
+            tagsInput.focus();
+        };
+        container.appendChild(div);
+    });
+
+    suggestionIndex = -1;
+
+    tagsInput.parentNode.appendChild(container);
+});
+
+tagsInput.addEventListener("blur", () => {
+    setTimeout(closeTagSuggestions, 150); // задержка, чтобы клик по подсказке успел сработать
+});
+
+tagsInput.addEventListener("keydown", e => {
+    const container = document.querySelector(".tag-suggestion-container");
+    if (!container) return;
+
+    const items = container.querySelectorAll(".tag-suggestion");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        suggestionIndex = (suggestionIndex + 1) % items.length;
+    } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        suggestionIndex = (suggestionIndex - 1 + items.length) % items.length;
+    } else if (e.key === "Enter") {
+        if (suggestionIndex >= 0 && suggestionIndex < items.length) {
+            e.preventDefault();
+            items[suggestionIndex].click();
+        }
+    } else if (e.key === "Escape") {
+        closeTagSuggestions();
+    }
+
+    // подсветка активного
+    items.forEach((el, i) => {
+        el.classList.toggle("active", i === suggestionIndex);
+    });
+});
+
+
+function closeTagSuggestions() {
+    const existing = document.querySelector(".tag-suggestion-container");
+    if (existing) existing.remove();
 }
 
 
@@ -649,25 +746,70 @@ window.onload = function () {
 
     document.addEventListener("keydown", e => {
         const isFullscreen = document.getElementById("fullscreen-container").style.display === "flex";
-        if (isFullscreen) {
-            if (e.key === "ArrowLeft") prevImage();
-            if (e.key === "ArrowRight") nextImage();
-            if (e.key === "Escape") closeFullscreen();
-            if (e.key === "Delete") deleteFullscreen();
+        const tagInput = document.getElementById("fullscreen-tags");
+        const isTagInputFocused = document.activeElement === tagInput;
 
-            const tagInput = document.getElementById("fullscreen-tags");
-            if (e.key === "Enter" && document.activeElement === tagInput) {
-                e.preventDefault();
-                saveTags();
+        if (isFullscreen) {
+            if (!isTagInputFocused) {
+                if (e.key === "ArrowLeft") prevImage();
+                if (e.key === "ArrowRight") nextImage();
+                if (e.key === "Delete") deleteFullscreen();
+            }
+            if (e.key === "Escape") {
+                if (isTagInputFocused) {
+                    tagInput.blur();
+                } else {
+                    closeFullscreen();
+                }
+            }
+
+
+            if (isTagInputFocused) {
+                const suggestionBox = document.querySelector(".tag-suggestion-container");
+                const suggestions = suggestionBox?.querySelectorAll(".tag-suggestion") || [];
+
+                if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    suggestionIndex = (suggestionIndex + 1) % suggestions.length;
+                } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
+                } else if (e.key === "Escape") {
+                    closeTagSuggestions();
+                    suggestionIndex = -1;
+                } else if (e.key === "Enter") {
+                    if (suggestionIndex >= 0 && suggestionIndex < suggestions.length) {
+                        e.preventDefault();
+                        suggestions[suggestionIndex].click(); // вставит тег, но НЕ сохранит
+                        return;
+                    }
+                    e.preventDefault();
+                    saveTags(); // обычный Enter, когда подсказок нет
+                }
+
+                // Подсветка активного
+                suggestions.forEach((el, i) => {
+                    el.classList.toggle("active", i === suggestionIndex);
+                });
             }
         }
+
         if (e.ctrlKey && (e.key.toLowerCase() === "c" || e.key.toLowerCase() === "с")) {
+            const selection = window.getSelection();
+            const isTextSelected = selection && selection.toString().length > 0;
+
+            // Если фокус на поле ввода и есть выделенный текст — ничего не перехватываем
+            if (isTagInputFocused && isTextSelected) return;
+
+            // Иначе применяем поведение как раньше
             isFullscreen ? copyPromptFullscreen() : copyTooltipText();
         }
     });
 
     document.getElementById("fullscreen-container").addEventListener("click", e => {
-        const isOutside = !e.target.closest(".fullscreen-image-wrapper") && !e.target.closest(".nav-arrow");
+        const isOutside = !e.target.closest(".fullscreen-image-wrapper")
+            && !e.target.closest(".nav-arrow")
+            && !e.target.closest(".tag-suggestion-container");
         if (isOutside) closeFullscreen();
     });
 

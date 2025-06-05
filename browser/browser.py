@@ -10,6 +10,7 @@ import threading
 from flask import Flask, render_template, jsonify, send_from_directory, request, redirect
 from PIL import Image, UnidentifiedImageError
 from concurrent.futures import ThreadPoolExecutor
+from rapidfuzz import fuzz
 
 # --- Flask App Setup ---
 app = Flask(__name__, static_folder="static", template_folder="templates")
@@ -209,7 +210,7 @@ def get_images(subpath=""):
 
     images = get_sorted_images(folder_path, sort_by, order)
     if search:
-        if search.startswith("tags:"):
+        if search.startswith("tags:") or search.startswith("tag:") or search.startswith("t:"):
             raw = search[5:].strip().lower()
             if not raw:
                 # Поиск изображений без тегов
@@ -218,7 +219,10 @@ def get_images(subpath=""):
                 tags = [t.strip() for t in raw.split(",") if t]
                 images = [
                     img for img in images
-                    if all(t in [tag.lower() for tag in img["metadata"].get("tags", [])] for t in tags)
+                    if all(
+                        any(fuzz.partial_ratio(t, tag.lower()) >= 80 for tag in img["metadata"].get("tags", []))
+                        for t in tags
+                    )
                 ]
         else:
             images = [img for img in images if search in img["metadata"].get("prompt", "").lower()]
@@ -295,6 +299,23 @@ def copy_to_favorites():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/all_tags')
+def get_all_tags():
+    tag_set = set()
+    for dirpath, _, filenames in os.walk(IMAGE_FOLDER):
+        for filename in filenames:
+            if filename.endswith(".json"):
+                try:
+                    with open(os.path.join(dirpath, filename), "r", encoding="utf-8") as f:
+                        metadata = json.load(f)
+                        for tag in metadata.get("tags", []):
+                            tag_set.add(tag)
+                except Exception as e:
+                    app.logger.warning(f"Не удалось прочитать {filename}: {e}")
+                    continue
+    return jsonify(sorted(tag_set))
 
 
 # --- Startup ---
