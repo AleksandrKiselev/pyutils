@@ -606,6 +606,23 @@ tagsInput.addEventListener("keydown", e => {
         }
     } else if (e.key === "Escape") {
         closeTagSuggestions();
+    } else if (e.key === "Backspace" && e.ctrlKey) {
+        e.preventDefault();
+        const pos = tagsInput.selectionStart;
+        const before = tagsInput.value.slice(0, pos);
+        const after = tagsInput.value.slice(tagsInput.selectionEnd);
+        const lastComma = before.lastIndexOf(",");
+
+        let newBefore;
+        if (lastComma >= 0) {
+            newBefore = before.slice(0, lastComma).replace(/\s+$/, "");
+        } else {
+            newBefore = ""; // если вообще нет запятой — удаляем всё
+        }
+
+        tagsInput.value = newBefore + after;
+        const newPos = newBefore.length;
+        tagsInput.setSelectionRange(newPos, newPos);
     }
 
     // подсветка активного
@@ -814,6 +831,9 @@ window.onload = function () {
     });
 
     updateToggleButtonPosition();
+
+    const searchBox = document.getElementById("search-box");
+    if (searchBox) searchBox.focus();
 };
 
 window.onpopstate = () => {

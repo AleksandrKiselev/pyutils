@@ -1,7 +1,8 @@
 {
-    "image_folder": "d:\\AI-Software\\configs\\browser\\static\\images",
+    "image_folder": "d:\\AI-Software\\configs\\browser\\static\\images\\",
     "favorites_folder": "d:\\AI-Software\\configs\\browser\\static\\images\\favorites",
     "images_per_row": 5,
     "thumbnail_size": 512,
-    "items_per_page": 20
+    "items_per_page": 20,
+    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp"]
 }
