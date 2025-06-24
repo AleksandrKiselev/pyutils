@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import difflib
@@ -25,12 +26,15 @@ def get_image_tags(image_path):
         return set()
 
 
+def extract_seed(image_path):
+    base = os.path.basename(image_path)
+    return os.path.splitext(base)[0]
+
+
 def auto_add_tags_from_prompt(image_path, metadata, threshold=0.90):
     tag_list = config.AUTO_TAGS
     prompt_lower = metadata.get("prompt", "").lower()
     prompt_tokens = re.split(r"[.,:]", prompt_lower)
-    existing_tags = set(metadata.get("tags", []))
-    new_tags = set()
 
     def normalize(text):
         text = unicodedata.normalize("NFKC", text.lower())
@@ -60,14 +64,15 @@ def auto_add_tags_from_prompt(image_path, metadata, threshold=0.90):
 
     with ThreadPoolExecutor() as executor:
         results = executor.map(check_tag, tag_list)
-    for tag in results:
-        if tag:
-            new_tags.add(tag)
 
-    new_tags.update(get_image_tags(image_path))
+    prompt_tags = {tag for tag in results if tag}
+    auto_tags = set()
+    auto_tags.update(get_image_tags(image_path))
+    auto_tags.add(extract_seed(image_path))
 
-    if new_tags:
-        metadata["tags"] = sorted(existing_tags.union(new_tags))
+    existing_tags = set(metadata.get("tags", []))
+    combined = sorted(existing_tags.union(prompt_tags)) + list(auto_tags)
+    metadata["tags"] = combined
 
 
 @lru_cache(maxsize=1)

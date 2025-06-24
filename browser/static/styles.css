@@ -296,6 +296,14 @@ body.sidebar-visible .container {
     transform: translateY(0);
 }
 
+.tooltip-seed {
+    font-size: 11px;
+    color: rgba(180, 180, 180, 0.6);
+    margin-top: 3px;
+    text-align: left;
+    width: 100%;
+}
+
 .tooltip-text {
     text-align: left;
     width: 100%;

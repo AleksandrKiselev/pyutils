@@ -118,6 +118,7 @@ async function loadMoreImages(limit = LIMIT) {
 function renderImageCards(images) {
     return images.map((img, index) => {
         const prompt = escapeJS(img.metadata.prompt);
+        const seed = escapeJS(extractSeed(img.filename));
         const tagsJson = JSON.stringify(img.metadata.tags || []).replace(/"/g, '&quot;');
 
         return `
@@ -138,7 +139,7 @@ function renderImageCards(images) {
                         </span>`).join('')}
                 </div>
                 <img src="/serve_thumbnail/${img.thumbnail}" alt="Image" loading="lazy"
-                     onmouseenter="showTooltip(event, '${prompt}', ${tagsJson})"
+                     onmouseenter="showTooltip(event, '${prompt}', '${seed}', ${tagsJson})"
                      onmousemove="updateTooltipPosition(event)"
                      onmouseleave="hideTooltip()">
             </div>`;
@@ -234,16 +235,21 @@ function escapeJS(str) {
     return str.replace(/'/g, "\\'");
 }
 
-function showTooltip(event, text, tags = []) {
+function extractSeed(filename) {
+    return filename.replace(/^.*[\\/]/, "").replace(/\.[^/.]+$/, "");
+}
+
+
+function showTooltip(event, text, seed, tags = []) {
     clearTimeout(tooltipTimeout);
 
     if (tags.length) {
         const pillsHTML = `<div class="tooltip-tags">${tags.map(tag =>
             `<span class="tag-pill tooltip-pill">${escapeHTML(tag)}</span>`).join("")}</div>`;
 
-        tooltip.innerHTML = `<div class="tooltip-text">${escapeHTML(text)}</div>${pillsHTML}<div class="tooltip-hint">CTRL+C</div>`;
+        tooltip.innerHTML = `<div class="tooltip-seed">${escapeHTML(seed)}</div><div class="tooltip-text">${escapeHTML(text)}</div>${pillsHTML}<div class="tooltip-hint">CTRL+C</div>`;
     } else {
-        tooltip.innerHTML = `<div class="tooltip-text">${escapeHTML(text)}</div><div class="tooltip-hint">CTRL+C</div>`;
+        tooltip.innerHTML = `<div class="tooltip-seed">${escapeHTML(seed)}</div><div class="tooltip-text">${escapeHTML(text)}</div><div class="tooltip-hint">CTRL+C</div>`;
     }
 
 
@@ -277,13 +283,25 @@ function hideTooltip(event) {
 }
 
 function copyTooltipText() {
-    const text = tooltip.querySelector(".tooltip-text")?.textContent?.trim();
-    if (!text) return;
+    const textEl = tooltip.querySelector(".tooltip-text");
+    const seedEl = tooltip.querySelector(".tooltip-seed");
 
-    navigator.clipboard.writeText(text).then(() => {
-        tooltip.querySelector(".tooltip-text").textContent = "Copied!";
+    const prompt = textEl?.textContent?.trim();
+    const seed = seedEl?.textContent?.trim();
+
+    if (!prompt || !seed) return;
+
+    const combined = `${seed}\n${prompt}`;
+
+    navigator.clipboard.writeText(combined).then(() => {
+        textEl.textContent = "Copied!";
         tooltip.querySelector(".tooltip-hint").textContent = "";
-        setTimeout(() => tooltip.innerHTML = `<div class="tooltip-text">${escapeHTML(text)}</div><div class="tooltip-hint">CTRL+C</div>`, 700);
+        setTimeout(() => {
+            tooltip.innerHTML = `
+                <div class="tooltip-seed">${escapeHTML(seed)}</div>
+                <div class="tooltip-text">${escapeHTML(prompt)}</div>
+                <div class="tooltip-hint">CTRL+C</div>`;
+        }, 700);
     });
 }
 
@@ -500,12 +518,13 @@ function saveTags() {
         const imgEl = container.querySelector("img");
         if (imgEl) {
             const prompt = escapeJS(data.metadata.prompt);
+            const seed = escapeJS(extractSeed(data.filename));
             const tagsJson = JSON.stringify(tags)
                 .replace(/\\/g, "\\\\")
                 .replace(/'/g, "\\'")
                 .replace(/</g, "\\u003c")
                 .replace(/>/g, "\\u003e");
-            imgEl.setAttribute("onmouseenter", `showTooltip(event, '${prompt}', ${tagsJson})`);
+            imgEl.setAttribute("onmouseenter", `showTooltip(event, '${prompt}', '${seed}', ${tagsJson})`);
         }
     }
 

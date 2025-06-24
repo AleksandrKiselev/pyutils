@@ -1,3 +1,4 @@
+import json
 import os
 from flask import Blueprint, request, jsonify, render_template, send_from_directory
 from config import config
@@ -119,11 +120,33 @@ def copy_to_favorites():
     try:
         if os.path.abspath(src) == os.path.abspath(dst):
             return jsonify({"error": "Source and destination are the same"}), 400
+
+        # 1. Копируем изображение
         with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
             fdst.write(fsrc.read())
+
+        # 2. Путь к .json исходника и копии
+        src_meta = get_metadata_path(filename)
+        dst_meta = get_metadata_path(dst)
+
+        # 3. Копируем и модифицируем метаданные
+        meta = {}
+        if os.path.exists(src_meta):
+            with open(src_meta, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+
+        tags = set(meta.get("tags", []))
+        tags.add("favorite")
+        meta["tags"] = sorted(tags)
+
+        with open(dst_meta, "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+
         return jsonify({"success": True})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @routes.route('/all_tags')
