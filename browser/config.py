@@ -39,6 +39,7 @@ def load_config():
     loaded_config.IMAGES_PER_ROW = int(loaded_config["images_per_row"])
     loaded_config.THUMBNAIL_SIZE = int(loaded_config["thumbnail_size"])
     loaded_config.ITEMS_PER_PAGE = int(loaded_config["items_per_page"])
+    loaded_config.AUTO_TAGS = set(loaded_config["auto_tags"])
 
     return loaded_config
 

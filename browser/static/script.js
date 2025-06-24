@@ -292,8 +292,6 @@ function openFullscreen(index) {
     currentIndex = index;
     updateFullscreenView();
     document.getElementById('fullscreen-container').style.display = 'flex';
-    const tagInput = document.getElementById("fullscreen-tags");
-    tagInput.focus();
 }
 
 function closeFullscreen() {
@@ -482,7 +480,7 @@ function renderFullscreenTagPills(tags) {
         span.className = "tag-pill";
         span.textContent = tag;
         span.onclick = () => {
-            document.getElementById("search-box").value = "tags:" + tag;
+            document.getElementById("search-box").value = "t:" + tag;
             filterImages();
             closeFullscreen();
         };
@@ -831,9 +829,6 @@ window.onload = function () {
     });
 
     updateToggleButtonPosition();
-
-    const searchBox = document.getElementById("search-box");
-    if (searchBox) searchBox.focus();
 };
 
 window.onpopstate = () => {

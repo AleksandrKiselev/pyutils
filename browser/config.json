@@ -1,8 +1,55 @@
 {
-    "image_folder": "d:\\AI-Software\\configs\\browser\\static\\images\\",
-    "favorites_folder": "d:\\AI-Software\\configs\\browser\\static\\images\\favorites",
+    "image_folder": "d:\\AI-Software\\configs\\images\\",
+    "favorites_folder": "d:\\AI-Software\\configs\\images\\favorites",
     "images_per_row": 5,
     "thumbnail_size": 512,
     "items_per_page": 20,
-    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp"]
+    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp"],
+    "auto_tags": [
+        "solo", "2girls", "3girls", "1male", "2males", "3males", "1boy", "2boys", "3boys",
+        "multiple males", "group sex", "gangbang", "threesome", "orgy",
+
+        "lying", "standing", "sitting", "kneeling", "squatting", "straddling", "on all fours",
+        "bent over", "arched back",
+        "legs spread", "legs together", "legs lift", "legs up", "legs rise", "one leg raised", "legs apart",
+        "ass up", "face down", "top-down bottom-up", "jack-o-pose",
+
+        "riding", "cowgirl", "doggystyle", "missionary", "spitroast", "full nelson",
+        "oral", "fellatio", "blowjob", "deepthroat", "facefuck", "worship", "licking cock",
+        "paizuri", "tittyfuck", "hairjob", "handjob", "footjob", "buttjob", "assjob", "thighjob",
+        "vaginal", "anal", "double penetration", "triple penetration",
+        "cum", "semen", "creampie", "cumshot", "precum", "facial", "bukkake", "ejaculation", "squirting",
+        "masturbation", "fingering", "spank", "slap", "rough sex", "rape", "pull", "grub",
+        "x-ray", "cross-section", "cervix", "uterus" ,"ovulation", "fertilization", "impregnation", "pregnant",
+
+        "front view", "side view", "rear view", "back view", "3/4 side view",
+        "from above", "from below", "from behind", "from front", "pov",
+        "low angle", "high angle", "wide angle", "close-up", "full body",
+        "recording", "selfie",
+        "spoken heart", "sound effects", "motion lines", "motion blur", "dutch angle", "unique perspective",
+
+        "ahegao", "fucked silly", "orgasm", "heart-shaped pupils", "heart-shaped eyes",
+        "closed eyes", "eyes rolled up", "eyes crossed", "moan", "drool",
+        "exhausted", "horny", "lustful", "playful", "seductive", "naughty", "half-lidded eyes", "parted lips",
+        "shocked", "surprised", "scared", "worried", "crying", "tears", "wide eyes",
+        "happy", "smile", "coy eyes", "doe eyes", "smirk", "embarrassed", "shy",
+
+        "anus", "asshole", "pussy", "clitor", "labia" ,"pubic hair", "penis", "cock", "glans", "balls", "testicles",
+
+        "character sheet", "multiple views", "split view", "2koma",
+
+        "lingerie", "panties", "stockings", "thighhighs", "pantyhose", "fishnets", "latex", "leather",
+        "corset", "garter belt", "high heels", "boots", "choker", "collar", "leash",
+        "glasses", "jewelry", "blindfold", "gag", "bunny suit", "maid outfit", "schoolgirl",
+
+        "brown hair", "black hair", "blonde", "red hair", "redhead", "white hair", "silver hair", "ginger hair",
+        "gray hair", "blue hair", "green hair", "purple hair", "pink hair", "orange hair", "aqua hair",
+        "short hair", "medium hair", "long hair", "straight hair", "wavy hair", "curly hair", "messy hair",
+        "twin tails", "ponytail", "braid", "hair bun", "bob cut", "hime cut",
+
+        "milf", "mature", "loli", "child", "young", "petite", "size difference", "interracial", "freckles",
+
+        "tentacles", "elf", "orc", "witch", "magic", "fantasy", "medieval", "cyberpunk", "realistic", "realism", "anime",
+        "goth", "bimbo", "slut", "makeup"
+    ]
 }

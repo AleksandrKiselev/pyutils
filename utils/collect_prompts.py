@@ -3,8 +3,8 @@ import json
 import re
 
 # Путь к папке с JSON-файлами
-folder_path = "d:\\AI-Software\\configs\\browser\\static\\images\\model\\4thTail\\styles\\.metadata"
-output_txt = "D:\\AI-Software\\configs\\wildcards\\style\\4thTail_best.txt"
+folder_path = "D:\\AI-Software\\configs\\images\\prompt\\.metadata"
+output_txt = "D:\\AI-Software\\configs\\wildcards\\prompt\\prompt.txt"
 
 prompts = []
 
@@ -15,7 +15,7 @@ files = [
 ]
 
 # Сортируем по времени создания
-files.sort(key=lambda x: x[1], reverse=True)
+files.sort(key=lambda x: x[1], reverse=False)
 
 # Обрабатываем файлы в порядке времени создания
 for file_path, _ in files:

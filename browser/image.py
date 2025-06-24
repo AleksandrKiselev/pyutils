@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 from rapidfuzz import fuzz
 from metadata import load_metadata
@@ -41,6 +42,7 @@ def process_image(image_path):
     }
 
 
+
 def collect_images(folder=None):
     image_paths = []
 
@@ -48,11 +50,14 @@ def collect_images(folder=None):
         paths = os.listdir(folder)
         image_paths = [os.path.join(folder, f) for f in paths if f.lower().endswith(".png")]
     else:
-        for image_path in walk_images():
-            image_paths.append(image_path)
+        image_paths = list(walk_images())
 
+    results = []
     with ThreadPoolExecutor(max_workers=10) as pool:
-        return list(pool.map(process_image, image_paths))
+        for result in tqdm(pool.map(process_image, image_paths), total=len(image_paths), desc="Processing images"):
+            results.append(result)
+
+    return results
 
 
 def sort_images(images, sort_by, order):
@@ -83,17 +88,28 @@ def filter_images(images, search):
     if not search:
         return images
 
+    def normalize(tag):
+        return tag.strip().lower()
+
     if search.startswith(("tags:", "tag:", "t:")):
         raw = search.split(":", 1)[1].strip().lower()
         if not raw:
             return [img for img in images if not img["metadata"].get("tags")]
-        tags = [t.strip() for t in raw.split(",") if t]
-        return [
-            img for img in images
-            if all(
-                any(fuzz.partial_ratio(t, tag.lower()) >= 85 for tag in img["metadata"].get("tags", []))
-                for t in tags
-            )
+
+        # Разбиваем на группы: каждая группа — это дизъюнкция тегов
+        groups = [
+            [normalize(t) for t in part.split("|") if t]
+            for part in raw.split(",") if part
         ]
+
+        def match(image_tags):
+            image_tags = set(normalize(tag) for tag in image_tags)
+            for group in groups:
+                if not any(tag in image_tags for tag in group):
+                    return False
+            return True
+
+        return [img for img in images if match(img["metadata"].get("tags", []))]
+
     else:
         return [img for img in images if search in img["metadata"].get("prompt", "").lower()]

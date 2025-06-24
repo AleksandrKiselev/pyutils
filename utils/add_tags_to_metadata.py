@@ -2,8 +2,8 @@ import os
 import json
 
 # === Настройки ===
-ROOT_FOLDER = r"d:\AI-Software\configs\browser\static\images\lora\style"
-NEW_TAGS = ["lora", "style", "portrait"]
+ROOT_FOLDER = r"d:\AI-Software\configs\browser\static\images\char\rita"
+NEW_TAGS = ["rita"]
 
 def walk_metadata_files(root_folder):
     for root, dirs, files in os.walk(root_folder):
@@ -11,7 +11,6 @@ def walk_metadata_files(root_folder):
             for file in files:
                 if file.lower().endswith(".json"):
                     yield os.path.join(root, file)
-
 
 def process_metadata_file(path, new_tags):
     try:
@@ -24,10 +23,10 @@ def process_metadata_file(path, new_tags):
     old_tags = set(data.get("tags", []))
     added_tags = [tag for tag in new_tags if tag not in old_tags]
 
-    if not added_tags:
+    if not added_tags and len(old_tags) == len(data.get("tags", [])):
         return
 
-    data["tags"] = list(old_tags.union(added_tags))
+    data["tags"] = list(old_tags.union(new_tags))
 
     try:
         with open(path, "w", encoding="utf-8") as f:

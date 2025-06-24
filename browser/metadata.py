@@ -6,6 +6,7 @@ import zlib
 import logging
 from functools import lru_cache
 from file_utils import get_metadata_path
+from tag import auto_add_tags_from_prompt
 
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ def load_metadata(image_path, mtime):
 
 def save_metadata(image_path, metadata):
     try:
+        auto_add_tags_from_prompt(image_path, metadata)
         with open(get_metadata_path(image_path), "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=4)
     except Exception as e:
