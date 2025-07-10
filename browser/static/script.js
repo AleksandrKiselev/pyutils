@@ -364,6 +364,42 @@ function updateFullscreenView() {
             body: JSON.stringify({ filename: data.filename, checked })
         }).catch(console.error);
     };
+
+    // === ⭐ Fullscreen Rating Logic ===
+    const ratingContainer = document.getElementById("fullscreen-rating");
+    if (!ratingContainer) return;
+    const stars = ratingContainer.querySelectorAll(".star");
+    const rating = data.metadata.rating || 0;
+
+    stars.forEach(star => {
+        const starRating = parseInt(star.dataset.rating);
+        star.textContent = starRating <= rating ? "★" : "☆";
+        star.classList.toggle("selected", starRating <= rating);
+
+        star.onclick = function (e) {
+            e.stopPropagation();
+
+            data.metadata.rating = starRating;
+
+            // Обновим звезды в fullscreen
+            stars.forEach(s => {
+                const r = parseInt(s.dataset.rating);
+                s.textContent = r <= starRating ? "★" : "☆";
+                s.classList.toggle("selected", r <= starRating);
+            });
+
+            // Обновим миниатюры
+            updateStars(null, data.filename, starRating);
+
+            // Сохраним на сервере
+            fetch("/update_metadata", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filename: data.filename, rating: starRating })
+            }).catch(console.error);
+        };
+    });
+
 }
 
 function prevImage() {

@@ -1,3 +1,6 @@
+"""
+Tag extraction, normalization, and management for the image browser application.
+"""
 import os
 import json
 import logging
@@ -10,11 +13,10 @@ from config import config
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 
-
 logger = logging.getLogger(__name__)
 
-
 def get_image_tags(image_path):
+    """Return a set of tags describing image orientation and resolution."""
     try:
         with Image.open(image_path) as img:
             width, height = img.size
@@ -25,13 +27,13 @@ def get_image_tags(image_path):
         logger.warning(f"Failed to get image tags: {e}")
         return set()
 
-
 def extract_seed(image_path):
+    """Extract the seed from the image filename (without extension)."""
     base = os.path.basename(image_path)
     return os.path.splitext(base)[0]
 
-
 def auto_add_tags_from_prompt(image_path, metadata, threshold=0.90):
+    """Automatically add tags to metadata based on prompt and image properties."""
     tag_list = config.AUTO_TAGS
     prompt_lower = metadata.get("prompt", "").lower()
     prompt_tokens = re.split(r"[.,:]", prompt_lower)
@@ -39,17 +41,12 @@ def auto_add_tags_from_prompt(image_path, metadata, threshold=0.90):
     def normalize(text):
         text = unicodedata.normalize("NFKC", text.lower())
         text = text.strip(' \t\n"\'')
-
-        # Замены символов
+        # Replace special characters and normalize whitespace
         text = text.replace("-", " ").replace("_", " ")
         text = text.replace("’", "'").replace("`", "'")
         text = text.replace("“", '"').replace("”", '"')
         text = text.replace("…", "...")
-
-        # Удаление лишней пунктуации
         text = re.sub(r"[.,!?;:(){}\[\]]", "", text)
-
-        # Приведение пробелов к одному
         text = re.sub(r"\s+", " ", text)
         return text.strip()
 
@@ -74,9 +71,9 @@ def auto_add_tags_from_prompt(image_path, metadata, threshold=0.90):
     combined = sorted(existing_tags.union(prompt_tags)) + list(auto_tags)
     metadata["tags"] = combined
 
-
 @lru_cache(maxsize=1)
 def get_all_tags_cached():
+    """Return a sorted list of all unique tags from all metadata files."""
     tags = set()
     for file in walk_metadata():
         try:
@@ -84,5 +81,5 @@ def get_all_tags_cached():
                 metadata = json.load(f)
                 tags.update(metadata.get("tags", []))
         except Exception as e:
-            logger.warning(f"Не удалось прочитать {file}: {e}")
+            logger.warning(f"Failed to read {file}: {e}")
     return sorted(tags)

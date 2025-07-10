@@ -1,3 +1,6 @@
+"""
+Metadata extraction, loading, and saving for images in the browser application.
+"""
 import json
 import os
 import re
@@ -8,11 +11,10 @@ from functools import lru_cache
 from file_utils import get_metadata_path
 from tag import auto_add_tags_from_prompt
 
-
 logger = logging.getLogger(__name__)
 
-
 def extract_prompt_from_png(image_path):
+    """Extract the prompt string from PNG metadata chunks."""
     try:
         with open(image_path, "rb") as f:
             data = f.read()
@@ -43,9 +45,9 @@ def extract_prompt_from_png(image_path):
         logger.error(f"Error reading metadata: {e}")
         return "No metadata found"
 
-
 @lru_cache(maxsize=512)
 def load_metadata(image_path, mtime):
+    """Load metadata for an image, creating defaults if necessary. Uses LRU cache for performance."""
     path = get_metadata_path(image_path)
     metadata = {}
     modified = False
@@ -76,8 +78,8 @@ def load_metadata(image_path, mtime):
 
     return metadata
 
-
 def save_metadata(image_path, metadata):
+    """Save metadata for an image, auto-adding tags from prompt."""
     try:
         auto_add_tags_from_prompt(image_path, metadata)
         with open(get_metadata_path(image_path), "w", encoding="utf-8") as f:

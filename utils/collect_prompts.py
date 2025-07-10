@@ -3,8 +3,8 @@ import json
 import re
 
 # Путь к папке с JSON-файлами
-folder_path = "d:\\AI-Software\\configs\\images\\model\\pony\\adrothver499\\nsfw\\.metadata"
-output_txt = "D:\\AI-Software\\configs\\wildcards\\nsfw\\nsfw.txt"
+folder_path = "d:\\AI-Software\\configs\\images\\char\\.metadata"
+output_txt = "D:\\AI-Software\\configs\\wildcards\\char\\char.txt"
 
 prompts = []
 

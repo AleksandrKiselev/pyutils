@@ -494,6 +494,36 @@ body.sidebar-visible .nav-left {
     transition: filter 0.3s ease-in-out;
 }
 
+.fullscreen-rating {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 4px;
+    background: var(--hover-bg);
+    padding: 4px;
+    border-radius: 6px;
+    opacity: 0.8;
+    z-index: 1010;
+    transition: opacity 0.2s;
+}
+
+.fullscreen-rating:hover {
+    opacity: 1;
+}
+
+.fullscreen-rating .star {
+    font-size: 20px;
+    color: #888;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.fullscreen-rating .star:hover,
+.fullscreen-rating .star.selected {
+    color: #ffcc00;
+}
+
 /* Fullscreen tags */
 #fullscreen-tags-wrapper {
     margin-top: 10px;

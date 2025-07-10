@@ -195,6 +195,7 @@ def process_file(file_path,
                  filter_similarity_threshold=90,
                  sort_by_similarity=False,
                  sort_by_tags=False,
+                 sort_by_prompt=False,
                  cluster_similarity_threshold=80,
                  add_empty_lines = False,
                  apply_mixed_case_conversion=False):
@@ -231,8 +232,11 @@ def process_file(file_path,
                 lines.extend(ungrouped)
             formatted_lines = [line for line in lines if line.strip()]
 
-        else:
+        elif sort_by_prompt:
             lines.sort(key=lambda x: x.lower())
+            formatted_lines = [line for line in lines if line.strip()]
+
+        else:
             formatted_lines = [line for line in lines if line.strip()]
 
         if add_empty_lines:
