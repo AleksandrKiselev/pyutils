@@ -291,7 +291,8 @@ function copyTooltipText() {
 
     if (!prompt || !seed) return;
 
-    const combined = `${seed}\n${prompt}`;
+    // const combined = `${seed}\n${prompt}`;
+    const combined = `${prompt}`;
 
     navigator.clipboard.writeText(combined).then(() => {
         textEl.textContent = "Copied!";

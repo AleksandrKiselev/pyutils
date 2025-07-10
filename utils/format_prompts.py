@@ -179,22 +179,20 @@ def summarize_group(group, group_name="unnamed group"):
 
 
 key_tag_groups = {
-    'solo': {'solo'},
-    'group sex': {'2males', '3males', '4males', 'gangbang', 'multiple male', 'multiple boy',
-                  'multiple cock', 'multiple penis', '2penis', '3penis',
-                  'threesome', 'group sex', 'spitroast', 'double penetration'},
+    'presenting': {'solo'},
+    'foreplay': {'buttjob', 'handjob', 'paizuri', 'titfuck', 'boobjob'},
     'blowjob': {'blowjob', 'deepthroat', 'fellatio', 'oral'},
-    'buttjob': {'buttjob'},
-    'handjob': {'handjob'},
-    'paizuri': {'paizuri', 'titfuck', 'boobjob'},
-    'doggystyle': {'doggystyle'},
     'missionary': {'missionary'},
     'cowgirl': {'cowgirl', 'riding'},
+    'doggystyle': {'doggystyle'},
+    'group sex': {'2boys', '3boys', '4boys', '2males', '3males', '4males', 'gangbang', 'multiple male', 'multiple boy',
+                  'multiple cock', 'multiple penis', '2penis', '3penis',
+                  'threesome', 'group sex', 'spitroast', 'double penetration'},
 }
 
 
 def process_file(file_path,
-                 filter_similarity_threshold=95,
+                 filter_similarity_threshold=90,
                  sort_by_similarity=False,
                  sort_by_tags=False,
                  cluster_similarity_threshold=80,
