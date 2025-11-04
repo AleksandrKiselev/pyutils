@@ -1,5 +1,6 @@
 import re
 import unicodedata
+import random
 from fuzzywuzzy import fuzz
 
 
@@ -196,6 +197,7 @@ def process_file(file_path,
                  sort_by_similarity=False,
                  sort_by_tags=False,
                  sort_by_prompt=False,
+                 random_sort=True,
                  cluster_similarity_threshold=80,
                  add_empty_lines = False,
                  apply_mixed_case_conversion=False):
@@ -235,7 +237,9 @@ def process_file(file_path,
         elif sort_by_prompt:
             lines.sort(key=lambda x: x.lower())
             formatted_lines = [line for line in lines if line.strip()]
-
+        elif random_sort:
+            lines = random.sample(lines, k=len(lines))
+            formatted_lines = [line for line in lines if line.strip()]
         else:
             formatted_lines = [line for line in lines if line.strip()]
 
