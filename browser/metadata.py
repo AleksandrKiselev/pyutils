@@ -70,7 +70,7 @@ def load_metadata(image_path, mtime):
         metadata["rating"] = 0
         modified = True
     if "tags" not in metadata:
-        metadata["tags"] = []
+        auto_add_tags_from_prompt(image_path, metadata)
         modified = True
 
     if modified:
@@ -81,7 +81,6 @@ def load_metadata(image_path, mtime):
 def save_metadata(image_path, metadata):
     """Save metadata for an image, auto-adding tags from prompt."""
     try:
-        auto_add_tags_from_prompt(image_path, metadata)
         with open(get_metadata_path(image_path), "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=4)
     except Exception as e:

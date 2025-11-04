@@ -1,5 +1,7 @@
 import json
 import os
+import logging
+from urllib.parse import unquote
 from flask import Blueprint, request, jsonify, render_template, send_from_directory
 from config import config
 from image import collect_images, filter_images, sort_images
@@ -8,6 +10,7 @@ from metadata import load_metadata, save_metadata
 from tag import get_all_tags_cached
 from file_utils import get_metadata_path, get_thumbnail_path, get_absolute_path
 
+logger = logging.getLogger(__name__)
 routes = Blueprint("routes", __name__)
 
 @routes.route("/")
@@ -147,3 +150,55 @@ def copy_to_favorites():
 def get_all_tags():
     """Return a JSON list of all unique tags in the dataset."""
     return jsonify(get_all_tags_cached())
+
+@routes.route("/uncheck_all", methods=["POST"])
+def uncheck_all():
+    """Uncheck all images in the given folder (or globally) matching the search query."""
+    
+    if not request.is_json:
+        logger.error("Request is not JSON")
+        return jsonify({"error": "Request must be JSON"}), 400
+    
+    data = request.get_json()
+    subpath = data.get("path", "")
+    raw_search = data.get("search", "")
+    
+    # Декодируем URL-кодированный путь
+    if subpath:
+        subpath = unquote(subpath)
+    
+    # Обрабатываем путь так же, как в get_images
+    try:
+        folder_path = get_absolute_path(subpath)
+        folder_path = os.path.normpath(folder_path)  # Нормализуем путь
+        
+        if not os.path.isdir(folder_path):
+            logger.error(f"Directory does not exist: '{folder_path}'")
+            return jsonify({"error": f"Path not exist: {folder_path} (subpath: '{subpath}')"}), 404
+    except Exception as e:
+        logger.exception(f"Error processing path: {e}")
+        return jsonify({"error": f"Error processing path: {str(e)}"}), 500
+
+    scope, search = parse_scope_and_query(raw_search)
+    
+    # Получаем все изображения согласно scope и search
+    images = collect_images(None if scope == "global" else folder_path)
+    images = filter_images(images, search)
+    
+    # Сбрасываем checked для всех найденных изображений
+    count = 0
+    for img in images:
+        image_path = get_absolute_path(img["filename"])
+        if not os.path.exists(image_path):
+            logger.warning(f"Image file not found: {image_path}")
+            continue
+        mtime = os.path.getmtime(image_path)
+        metadata = load_metadata(image_path, mtime)
+        if metadata["checked"]:
+            metadata["checked"] = False
+            save_metadata(image_path, metadata)
+            count += 1
+
+    load_metadata.cache_clear()
+    get_all_tags_cached.cache_clear()
+    return jsonify({"success": True, "count": count})

@@ -1,894 +1,1088 @@
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 const LIMIT = 50;
-const tooltip = document.getElementById("tooltip");
-
-let offset = 0;
-let loading = false;
-let currentImages = [];
-let currentIndex = 0;
-let searchQuery = "";
-let tooltipTimeout;
-let sortBy = "date-asc";
-let allTags = [];
-let suggestionIndex = -1;
-
-
-// --- Load Content ---
-async function updateUrl(event, path) {
-    event.preventDefault();
-    if (window.location.pathname === "/" + path) return;
-    saveGalleryState();
-    window.history.pushState({}, '', '/' + path);
-    await loadContent();
-    updateActiveFolderHighlight();
-}
-
-
-async function loadContent() {
-    document.getElementById('loading').style.display = 'block';
-    const path = window.location.pathname;
-    restoreGalleryState();
-    await (path === "/" ? loadFolders() : loadImages());
-    document.getElementById('loading').style.display = 'none';
-    fetchAllTags()
-}
-
-async function loadFolders() {
-    const folderList = document.getElementById('sidebar').querySelector('.sidebar-folders');
-    const response = await fetch('/');
-    const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
-    const incomingFolders = doc.querySelector('.sidebar-folders');
-    if (incomingFolders) {
-        folderList.innerHTML = incomingFolders.innerHTML;
-        updateActiveFolderHighlight();
-    } else {
-        console.error("❌ sidebar-folders not found in response");
-    }
-}
-
-function updateActiveFolderHighlight() {
-    const currentPath = window.location.pathname;
-
-    // Удаляем старую подсветку
-    document.querySelectorAll('.folder-tree a.active-folder')
-        .forEach(el => el.classList.remove('active-folder'));
-
-    // Добавляем новую подсветку
-    const selector = `.folder-tree a[href="${currentPath}"]`;
-    const activeLink = document.querySelector(selector);
-
-    if (activeLink) {
-        activeLink.classList.add('active-folder');
-        // Если элемент вне видимой области — скроллим его
-        activeLink.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-}
-
-function findFolderNode(path) {
-    const parts = path.split("/").filter(Boolean);
-    let fullPath = "";
-    let node = FOLDER_TREE;
-
-    for (let i = 0; i < parts.length; i++) {
-        fullPath = fullPath ? `${fullPath}/${parts[i]}` : parts[i];
-
-        const parent = node[fullPath];
-        if (!parent) return null;
-
-        // Если это последний элемент — вернём его
-        if (i === parts.length - 1) {
-            return parent;
-        }
-
-        // Иначе спускаемся глубже
-        node = parent.children;
-        if (!node || typeof node !== "object") return null;
-    }
-
-    return null;
-}
-
-// --- Image Gallery ---
-async function loadImages() {
-    loadFolders();
-    offset = 0;
-    currentImages = [];
-    const gallery = document.getElementById('gallery');
-    gallery.innerHTML = "";
-    gallery.style.gridTemplateColumns = `repeat(${IMAGES_PER_ROW}, minmax(120px, 1fr))`;
-    await loadMoreImages();
-}
-
-async function loadMoreImages(limit = LIMIT) {
-    if (loading) return;
-    loading = true;
-
-    const [sort, order] = sortBy.split("-");
-    const query = `/images${window.location.pathname}?limit=${limit}&offset=${offset}&search=${encodeURIComponent(searchQuery)}&sort_by=${sort}&order=${order}`;
-    const images = await (await fetch(query)).json();
-    if (!images.length) return loading = false;
-
-    currentImages.push(...images);
-    document.getElementById('gallery').insertAdjacentHTML("beforeend", renderImageCards(images));
-    loadCheckboxState();
-    images.forEach(img => updateStars(null, img.filename, img.metadata.rating || 0));
-    offset += images.length;
-    loading = false;
-}
-
-function renderImageCards(images) {
-    return images.map((img, index) => {
-        const prompt = escapeJS(img.metadata.prompt);
-        const seed = escapeJS(extractSeed(img.filename));
-        const tagsJson = JSON.stringify(img.metadata.tags || []).replace(/"/g, '&quot;');
-
-        return `
-            <div class="image-container" onclick="openFullscreen(${offset + index})"
-                 onmouseenter="showStars(event)" onmouseleave="hideStars(event)">
-                <div class="image-buttons">
-                    <button class="copy-btn" onclick="copyToClipboard(event, '${prompt}')">📋</button>
-                    <button class="copy-favorites-btn" onclick="copyToFavorites(event, '${img.filename}')">⭐</button>
-                    <input type="checkbox" class="image-checkbox" data-filename="${img.filename}"
-                           onclick="event.stopPropagation(); saveCheckboxState(event);">
-                    <button class="delete-btn" onclick="deleteThumbnail(event, '${img.filename}')">❌</button>
-                </div>
-                <div class="image-rating" style="opacity: 0;">
-                    ${[1,2,3,4,5].map(star => `
-                        <span class="star" data-filename="${img.filename}" data-rating="${star}"
-                              onclick="setRating(event, '${img.filename}', ${star})">
-                            ${img.metadata.rating >= star ? "★" : "☆"}
-                        </span>`).join('')}
-                </div>
-                <img src="/serve_thumbnail/${img.thumbnail}" alt="Image" loading="lazy"
-                     onmouseenter="showTooltip(event, '${prompt}', '${seed}', ${tagsJson})"
-                     onmousemove="updateTooltipPosition(event)"
-                     onmouseleave="hideTooltip()">
-            </div>`;
-        }).join('');
-}
-
-function filterImages() {
-    searchQuery = document.getElementById("search-box").value.trim();
-    loadImages();
-}
-
-function saveGalleryState() {
-    const state = {
-        currentPath: window.location.pathname,
-        scrollY: window.scrollY,
-        searchQuery: document.getElementById("search-box").value.trim(),
-        sortBy: document.getElementById("sort-select").value,
-        sidebarVisible: !document.getElementById("sidebar").classList.contains("hidden")
-    };
-
-    localStorage.setItem("galleryState", JSON.stringify(state));
-}
-
-
-function restoreGalleryState() {
-    const raw = localStorage.getItem("galleryState");
-    if (!raw) return;
-
-    try {
-        const state = JSON.parse(raw);
-
-        if (state.searchQuery !== undefined) {
-            searchQuery = state.searchQuery;
-            document.getElementById("search-box").value = searchQuery;
-        }
-
-        if (state.sortBy) {
-            sortBy = state.sortBy;
-            document.getElementById("sort-select").value = sortBy;
-        }
-
-        if (typeof state.sidebarVisible === "boolean") {
-            const sidebar = document.getElementById("sidebar");
-            const container = document.querySelector(".container");
-            sidebar.classList.toggle("hidden", !state.sidebarVisible);
-            container.classList.toggle("sidebar-visible", state.sidebarVisible);
-        }
-
-        setTimeout(() => {
-            window.scrollTo(0, state.scrollY || 0);
-        }, 0);
-    } catch (e) {
-        console.warn("Не удалось восстановить галерею:", e);
-    }
-}
-
-function scrollToTop() {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function uncheckAllCheckboxes() {
-    const checkboxes = document.querySelectorAll(".image-checkbox:checked");
-    if (!checkboxes.length) return;
-
-    const filenames = [];
-    checkboxes.forEach(cb => {
-        cb.checked = false;
-        filenames.push(cb.dataset.filename);
-
-        const container = cb.closest(".image-container");
-        if (container) container.classList.remove("checked");
-
-        const img = currentImages.find(i => i.filename === cb.dataset.filename);
-        if (img) img.metadata.checked = false;
-    });
-
-    fetch("/update_metadata", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filenames, checked: false })
-    }).catch(console.error);
-}
-
-
-// --- Tooltip ---
-function escapeHTML(str) {
-    return str.replace(/[&<>"']/g, m => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-    }[m]));
-}
-
-function escapeJS(str) {
-    return str.replace(/'/g, "\\'");
-}
-
-function extractSeed(filename) {
-    return filename.replace(/^.*[\\/]/, "").replace(/\.[^/.]+$/, "");
-}
-
-
-function showTooltip(event, text, seed, tags = []) {
-    clearTimeout(tooltipTimeout);
-
-    if (tags.length) {
-        const pillsHTML = `<div class="tooltip-tags">${tags.map(tag =>
-            `<span class="tag-pill tooltip-pill">${escapeHTML(tag)}</span>`).join("")}</div>`;
-
-        tooltip.innerHTML = `<div class="tooltip-seed">${escapeHTML(seed)}</div><div class="tooltip-text">${escapeHTML(text)}</div>${pillsHTML}<div class="tooltip-hint">CTRL+C</div>`;
-    } else {
-        tooltip.innerHTML = `<div class="tooltip-seed">${escapeHTML(seed)}</div><div class="tooltip-text">${escapeHTML(text)}</div><div class="tooltip-hint">CTRL+C</div>`;
-    }
-
-
-    tooltip.style.display = "block";
-    tooltip.classList.add("visible");
-    updateTooltipPosition(event);
-}
-
-function updateTooltipPosition(event) {
-    const { clientX: x0, clientY: y0 } = event;
-    const { offsetWidth: w, offsetHeight: h } = tooltip;
-
-    let x = x0 + 15;
-    let y = y0 + 15;
-
-    if (x + w > window.innerWidth) x = window.innerWidth - w - 10;
-    if (y + h > window.innerHeight) y = window.innerHeight - h - 10;
-
-    tooltip.style.left = `${x}px`;
-    tooltip.style.top = `${y + window.scrollY}px`;
-}
-
-function hideTooltip(event) {
-    if (!event?.relatedTarget || !event.relatedTarget.closest("#gallery")) {
-    clearTimeout(tooltipTimeout);
-    tooltipTimeout = setTimeout(() => {
-        tooltip.classList.remove("visible");
-        setTimeout(() => tooltip.style.display = "none", 100);
-    }, 200);
-}
-}
-
-function copyTooltipText() {
-    const textEl = tooltip.querySelector(".tooltip-text");
-    const seedEl = tooltip.querySelector(".tooltip-seed");
-
-    const prompt = textEl?.textContent?.trim();
-    const seed = seedEl?.textContent?.trim();
-
-    if (!prompt || !seed) return;
-
-    // const combined = `${seed}\n${prompt}`;
-    const combined = `${prompt}`;
-
-    navigator.clipboard.writeText(combined).then(() => {
-        textEl.textContent = "Copied!";
-        tooltip.querySelector(".tooltip-hint").textContent = "";
-        setTimeout(() => {
-            tooltip.innerHTML = `
-                <div class="tooltip-seed">${escapeHTML(seed)}</div>
-                <div class="tooltip-text">${escapeHTML(prompt)}</div>
-                <div class="tooltip-hint">CTRL+C</div>`;
-        }, 700);
-    });
-}
-
-// --- Fullscreen View ---
-function openFullscreen(index) {
-    currentIndex = index;
-    updateFullscreenView();
-    document.getElementById('fullscreen-container').style.display = 'flex';
-}
-
-function closeFullscreen() {
-    document.getElementById('fullscreen-container').style.display = 'none';
-}
-
-function updateFullscreenView() {
-    const data = currentImages[currentIndex];
-    if (!data) return;
-
-    document.getElementById('fullscreen-img').src = `/serve_image/${data.filename}`;
-
-    const promptEl = document.getElementById('fullscreen-prompt');
-    promptEl.dataset.prompt = data.metadata.prompt;
-    promptEl.textContent = data.metadata.prompt || "";
-
-    const checkbox = document.getElementById('fullscreen-checkbox');
-    const miniCheckbox = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`);
-    const isChecked = miniCheckbox ? miniCheckbox.checked : !!data.metadata.checked;
-
-    checkbox.dataset.filename = data.filename;
-    checkbox.checked = isChecked;
-
-    const wrapper = document.querySelector(".fullscreen-image-wrapper");
-    wrapper.classList.toggle("checked", isChecked);
-
-    const tagInput = document.getElementById("fullscreen-tags");
-    tagInput.value = (data.metadata.tags || []).join(", ");
-    const display = document.getElementById("fullscreen-tags-display");
-    display.innerHTML = "";
-    renderFullscreenTagPills(data.metadata.tags || []);
-
-    checkbox.onchange = function () {
-        const checked = checkbox.checked;
-        data.metadata.checked = checked;
-
-        wrapper.classList.toggle("checked", checked);
-
-        // синхронизация с миниатюрой
-        if (miniCheckbox) {
-            miniCheckbox.checked = checked;
-            const container = miniCheckbox.closest(".image-container");
-            if (container) {
-                container.classList.toggle("checked", checked);
-            }
-        }
-
-        fetch("/update_metadata", {
+const TOOLTIP_OFFSET = 15;
+const TOOLTIP_HIDE_DELAY = 200;
+const TOOLTIP_FADE_DELAY = 100;
+const SCROLL_THRESHOLD = 200;
+const SCROLL_TO_TOP_THRESHOLD = 300;
+const STARRED_SYMBOL = "★";
+const UNSTARRED_SYMBOL = "☆";
+const MAX_TAG_SUGGESTIONS = 10;
+const TAG_SUGGESTION_BLUR_DELAY = 150;
+const MAX_RATING = 5;
+const COPY_CONFIRMATION_DELAY = 700;
+const TAG_SAVED_INDICATOR_DELAY = 1000;
+
+// ============================================================================
+// DOM ELEMENTS
+// ============================================================================
+
+const DOM = {
+    tooltip: document.getElementById("tooltip"),
+    gallery: document.getElementById("gallery"),
+    sidebar: document.getElementById("sidebar"),
+    loading: document.getElementById("loading"),
+    searchBox: document.getElementById("search-box"),
+    sortSelect: document.getElementById("sort-select"),
+    scrollToTop: document.getElementById("scroll-to-top"),
+    menuToggle: document.getElementById("menu-toggle"),
+    menuIcon: document.getElementById("menu-icon"),
+    fullscreenContainer: document.getElementById("fullscreen-container"),
+    fullscreenImg: document.getElementById("fullscreen-img"),
+    fullscreenPrompt: document.getElementById("fullscreen-prompt"),
+    fullscreenCheckbox: document.getElementById("fullscreen-checkbox"),
+    fullscreenTags: document.getElementById("fullscreen-tags"),
+    fullscreenTagsDisplay: document.getElementById("fullscreen-tags-display"),
+    fullscreenRating: document.getElementById("fullscreen-rating"),
+    tagsSavedIndicator: document.getElementById("tags-saved-indicator")
+};
+
+// ============================================================================
+// STATE
+// ============================================================================
+
+const state = {
+    offset: 0,
+    loading: false,
+    currentImages: [],
+    currentIndex: 0,
+    searchQuery: "",
+    sortBy: "date-asc",
+    allTags: [],
+    suggestionIndex: -1,
+    tooltipTimeout: null
+};
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+const utils = {
+    escapeHTML(str) {
+        if (!str) return "";
+        const map = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        };
+        return str.replace(/[&<>"']/g, m => map[m]);
+    },
+
+    escapeJS(str) {
+        if (!str) return "";
+        return str.replace(/'/g, "\\'");
+    },
+
+    extractSeed(filename) {
+        if (!filename) return "";
+        return filename.replace(/^.*[\\/]/, "").replace(/\.[^/.]+$/, "");
+    },
+
+    sanitizeTagsJSON(tags) {
+        return JSON.stringify(tags || [])
+            .replace(/\\/g, "\\\\")
+            .replace(/'/g, "\\'")
+            .replace(/</g, "\\u003c")
+            .replace(/>/g, "\\u003e");
+    },
+
+    async apiRequest(endpoint, options = {}) {
+        const defaultOptions = {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ filename: data.filename, checked })
-        }).catch(console.error);
-    };
+            ...options
+        };
+        try {
+            console.log(`API request: ${endpoint}`, defaultOptions);
+            const response = await fetch(endpoint, defaultOptions);
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+                console.error(`API request failed: ${endpoint}`, response.status, errorData);
+                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error(`API request failed: ${endpoint}`, error);
+            throw error;
+        }
+    }
+};
 
-    // === ⭐ Fullscreen Rating Logic ===
-    const ratingContainer = document.getElementById("fullscreen-rating");
-    if (!ratingContainer) return;
-    const stars = ratingContainer.querySelectorAll(".star");
-    const rating = data.metadata.rating || 0;
+// ============================================================================
+// STATE MANAGEMENT
+// ============================================================================
 
-    stars.forEach(star => {
-        const starRating = parseInt(star.dataset.rating);
-        star.textContent = starRating <= rating ? "★" : "☆";
-        star.classList.toggle("selected", starRating <= rating);
+const stateManager = {
+    save() {
+        const state = {
+            currentPath: window.location.pathname,
+            scrollY: window.scrollY,
+            searchQuery: DOM.searchBox.value.trim(),
+            sortBy: DOM.sortSelect.value,
+            sidebarVisible: !DOM.sidebar.classList.contains("hidden")
+        };
+        localStorage.setItem("galleryState", JSON.stringify(state));
+    },
 
-        star.onclick = function (e) {
-            e.stopPropagation();
+    restore() {
+        const raw = localStorage.getItem("galleryState");
+        if (!raw) return;
 
-            data.metadata.rating = starRating;
+        try {
+            const saved = JSON.parse(raw);
 
-            // Обновим звезды в fullscreen
-            stars.forEach(s => {
-                const r = parseInt(s.dataset.rating);
-                s.textContent = r <= starRating ? "★" : "☆";
-                s.classList.toggle("selected", r <= starRating);
+            if (saved.searchQuery !== undefined) {
+                state.searchQuery = saved.searchQuery;
+                DOM.searchBox.value = saved.searchQuery;
+            }
+
+            if (saved.sortBy) {
+                state.sortBy = saved.sortBy;
+                DOM.sortSelect.value = saved.sortBy;
+            }
+
+            if (typeof saved.sidebarVisible === "boolean") {
+                DOM.sidebar.classList.toggle("hidden", !saved.sidebarVisible);
+                document.querySelector(".container")?.classList.toggle("sidebar-visible", saved.sidebarVisible);
+            }
+
+            setTimeout(() => {
+                window.scrollTo(0, saved.scrollY || 0);
+            }, 0);
+        } catch (e) {
+            console.warn("Не удалось восстановить галерею:", e);
+        }
+    }
+};
+
+// ============================================================================
+// NAVIGATION & FOLDERS
+// ============================================================================
+
+const navigation = {
+    async updateUrl(event, path) {
+        event.preventDefault();
+        if (window.location.pathname === `/${path}`) return;
+
+        stateManager.save();
+        window.history.pushState({}, '', `/${path}`);
+        await contentLoader.load();
+        folders.updateActiveHighlight();
+    },
+
+    async loadContent() {
+        DOM.loading.style.display = "block";
+        const path = window.location.pathname;
+        stateManager.restore();
+        await (path === "/" ? folders.load() : gallery.load());
+        DOM.loading.style.display = "none";
+        tags.fetchAll();
+    }
+};
+
+const folders = {
+    async load() {
+        const folderList = DOM.sidebar.querySelector(".sidebar-folders");
+        if (!folderList) return;
+
+        try {
+            const response = await fetch("/");
+            const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+            const incomingFolders = doc.querySelector(".sidebar-folders");
+
+            if (incomingFolders) {
+                folderList.innerHTML = incomingFolders.innerHTML;
+                folders.updateActiveHighlight();
+            } else {
+                console.error("❌ sidebar-folders not found in response");
+            }
+        } catch (error) {
+            console.error("Failed to load folders:", error);
+        }
+    },
+
+    updateActiveHighlight() {
+        const currentPath = window.location.pathname;
+        document.querySelectorAll(".folder-tree a.active-folder")
+            .forEach(el => el.classList.remove("active-folder"));
+
+        const activeLink = document.querySelector(`.folder-tree a[href="${currentPath}"]`);
+        if (activeLink) {
+            activeLink.classList.add("active-folder");
+            activeLink.scrollIntoView({ block: "center", behavior: "smooth" });
+        }
+    },
+
+    toggle(event) {
+        event.stopPropagation();
+        const item = event.currentTarget.closest(".folder-item");
+        const children = item.querySelector(".folder-children");
+        if (!children) return;
+
+        const expanded = item.classList.toggle("expanded");
+        children.classList.toggle("hidden", !expanded);
+    }
+};
+
+// ============================================================================
+// GALLERY
+// ============================================================================
+
+const gallery = {
+    async load() {
+        await folders.load();
+        state.offset = 0;
+        state.currentImages = [];
+        DOM.gallery.innerHTML = "";
+        DOM.gallery.style.gridTemplateColumns = `repeat(${IMAGES_PER_ROW}, minmax(120px, 1fr))`;
+        await gallery.loadMore();
+    },
+
+    async loadMore(limit = LIMIT) {
+        if (state.loading) return;
+        state.loading = true;
+
+        try {
+            const [sort, order] = state.sortBy.split("-");
+            const query = `/images${window.location.pathname}?limit=${limit}&offset=${state.offset}&search=${encodeURIComponent(state.searchQuery)}&sort_by=${sort}&order=${order}`;
+            const images = await (await fetch(query)).json();
+
+            if (!images.length) {
+                state.loading = false;
+                return;
+            }
+
+            // Убеждаемся, что у всех изображений есть метаданные с рейтингом
+            images.forEach(img => {
+                if (!img.metadata) {
+                    img.metadata = {};
+                }
+                if (img.metadata.rating === undefined || img.metadata.rating === null) {
+                    img.metadata.rating = 0;
+                }
             });
 
-            // Обновим миниатюры
-            updateStars(null, data.filename, starRating);
+            state.currentImages.push(...images);
+            DOM.gallery.insertAdjacentHTML("beforeend", gallery.renderCards(images));
+            gallery.loadCheckboxState();
+            images.forEach(img => rating.updateStars(null, img.filename, img.metadata.rating || 0));
+            state.offset += images.length;
+        } catch (error) {
+            console.error("Failed to load images:", error);
+        } finally {
+            state.loading = false;
+        }
+    },
 
-            // Сохраним на сервере
-            fetch("/update_metadata", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ filename: data.filename, rating: starRating })
+    renderCards(images) {
+        return images.map((img, index) => {
+            // Убеждаемся, что метаданные существуют
+            if (!img.metadata) {
+                img.metadata = {};
+            }
+            const prompt = utils.escapeJS(img.metadata.prompt || "");
+            const seed = utils.escapeJS(utils.extractSeed(img.filename));
+            const filenameEscaped = utils.escapeJS(img.filename || "");
+            const filenameAttrEscaped = img.filename ? img.filename.replace(/"/g, "&quot;").replace(/'/g, "&#39;") : "";
+            const tagsJson = utils.sanitizeTagsJSON(img.metadata.tags || []);
+            const ratingValue = img.metadata.rating || 0;
+
+            return `
+                <div class="image-container" onclick="fullscreen.open(${state.offset + index})"
+                     onmouseenter="rating.showStars(event)" onmouseleave="rating.hideStars(event)">
+                    <div class="image-buttons">
+                        <button class="copy-btn" onclick="clipboard.copy(event, '${prompt}')">📋</button>
+                        <button class="copy-favorites-btn" onclick="favorites.copy(event, '${filenameEscaped}')">⭐</button>
+                        <input type="checkbox" class="image-checkbox" data-filename="${filenameAttrEscaped}"
+                               onclick="event.stopPropagation(); gallery.saveCheckboxState(event);">
+                        <button class="delete-btn" onclick="gallery.deleteThumbnail(event, '${filenameEscaped}')">❌</button>
+                    </div>
+                    <div class="image-rating" style="opacity: 0;">
+                        ${Array.from({ length: MAX_RATING }, (_, i) => i + 1).map(star => `
+                            <span class="star" data-filename="${filenameAttrEscaped}" data-rating="${star}"
+                                  onclick="rating.set(event, '${filenameEscaped}', ${star})">
+                                ${ratingValue >= star ? STARRED_SYMBOL : UNSTARRED_SYMBOL}
+                            </span>`).join("")}
+                    </div>
+                    <img src="/serve_thumbnail/${img.thumbnail}" alt="Image" loading="lazy"
+                         onmouseenter="tooltip.show(event, '${prompt}', '${seed}', ${tagsJson})"
+                         onmousemove="tooltip.updatePosition(event)"
+                         onmouseleave="tooltip.hide()">
+                </div>`;
+        }).join("");
+    },
+
+    filter() {
+        state.searchQuery = DOM.searchBox.value.trim();
+        gallery.load();
+    },
+
+    async deleteThumbnail(event, filename) {
+        event.stopPropagation();
+        if (!confirm("Удалить изображение?")) return;
+
+        try {
+            const result = await utils.apiRequest("/delete_image", {
+                body: JSON.stringify({ filename })
+            });
+
+            if (result.success) {
+                event.target.closest(".image-container")?.remove();
+            } else {
+                alert("Ошибка удаления: " + (result.error || "неизвестная"));
+            }
+        } catch (error) {
+            alert("Ошибка удаления: " + error);
+        }
+    },
+
+    saveCheckboxState(event) {
+        const cb = event.target;
+        utils.apiRequest("/update_metadata", {
+            body: JSON.stringify({ filename: cb.dataset.filename, checked: cb.checked })
+        }).catch(console.error);
+    },
+
+    loadCheckboxState() {
+        document.querySelectorAll(".image-checkbox").forEach(cb => {
+            const img = state.currentImages.find(i => i.filename === cb.dataset.filename);
+            if (img) cb.checked = !!img.metadata.checked;
+        });
+        gallery.updateImageOpacity();
+    },
+
+    updateImageOpacity() {
+        document.querySelectorAll(".image-checkbox").forEach(cb => {
+            const container = cb.closest(".image-container");
+            if (container) {
+                container.classList.toggle("checked", cb.checked);
+            }
+        });
+    },
+
+    async uncheckAll() {
+        const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
+        const searchQuery = state.searchQuery || "";
+
+        console.log("Uncheck all - path:", currentPath, "search:", searchQuery);
+
+        try {
+            const result = await utils.apiRequest("/uncheck_all", {
+                body: JSON.stringify({ path: currentPath, search: searchQuery })
+            });
+
+            if (result.success) {
+                console.log(`✅ Сброшено чекбоксов: ${result.count}`);
+
+                // Обновляем визуальное отображение всех видимых чекбоксов
+                document.querySelectorAll(".image-checkbox").forEach(cb => {
+                    cb.checked = false;
+                    const container = cb.closest(".image-container");
+                    if (container) container.classList.remove("checked");
+                });
+
+                // Обновляем состояние в currentImages
+                state.currentImages.forEach(img => {
+                    if (img.metadata) {
+                        img.metadata.checked = false;
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("❌ Ошибка сброса чекбоксов:", error);
+            const errorMessage = error.message || error.toString();
+            alert("Ошибка сброса чекбоксов: " + errorMessage);
+        }
+    },
+
+    rebindIndices() {
+        document.querySelectorAll("#gallery .image-container").forEach((container, i) => {
+            container.setAttribute("onclick", `fullscreen.open(${i})`);
+        });
+    }
+};
+
+// ============================================================================
+// TOOLTIP
+// ============================================================================
+
+const tooltip = {
+    show(event, text, seed, tags = []) {
+        clearTimeout(state.tooltipTimeout);
+
+        const tagsHTML = tags.length
+            ? `<div class="tooltip-tags">${tags.map(tag =>
+                `<span class="tag-pill tooltip-pill">${utils.escapeHTML(tag)}</span>`).join("")}</div>`
+            : "";
+
+        DOM.tooltip.innerHTML = `
+            <div class="tooltip-seed">${utils.escapeHTML(seed)}</div>
+            <div class="tooltip-text">${utils.escapeHTML(text)}</div>
+            ${tagsHTML}
+            <div class="tooltip-hint">CTRL+C</div>`;
+
+        DOM.tooltip.style.display = "block";
+        DOM.tooltip.classList.add("visible");
+        tooltip.updatePosition(event);
+    },
+
+    updatePosition(event) {
+        const { clientX: x0, clientY: y0 } = event;
+        const { offsetWidth: w, offsetHeight: h } = DOM.tooltip;
+
+        let x = x0 + TOOLTIP_OFFSET;
+        let y = y0 + TOOLTIP_OFFSET;
+
+        if (x + w > window.innerWidth) x = window.innerWidth - w - 10;
+        if (y + h > window.innerHeight) y = window.innerHeight - h - 10;
+
+        DOM.tooltip.style.left = `${x}px`;
+        DOM.tooltip.style.top = `${y + window.scrollY}px`;
+    },
+
+    hide(event) {
+        if (event?.relatedTarget && event.relatedTarget.closest("#gallery")) return;
+
+        clearTimeout(state.tooltipTimeout);
+        state.tooltipTimeout = setTimeout(() => {
+            DOM.tooltip.classList.remove("visible");
+            setTimeout(() => {
+                DOM.tooltip.style.display = "none";
+            }, TOOLTIP_FADE_DELAY);
+        }, TOOLTIP_HIDE_DELAY);
+    },
+
+    async copyText() {
+        const textEl = DOM.tooltip.querySelector(".tooltip-text");
+        const seedEl = DOM.tooltip.querySelector(".tooltip-seed");
+
+        const prompt = textEl?.textContent?.trim();
+        const seed = seedEl?.textContent?.trim();
+
+        if (!prompt || !seed) return;
+
+        try {
+            await navigator.clipboard.writeText(prompt);
+            textEl.textContent = "Copied!";
+            DOM.tooltip.querySelector(".tooltip-hint").textContent = "";
+
+            setTimeout(() => {
+                DOM.tooltip.innerHTML = `
+                    <div class="tooltip-seed">${utils.escapeHTML(seed)}</div>
+                    <div class="tooltip-text">${utils.escapeHTML(prompt)}</div>
+                    <div class="tooltip-hint">CTRL+C</div>`;
+            }, COPY_CONFIRMATION_DELAY);
+        } catch (error) {
+            console.error("Failed to copy text:", error);
+        }
+    }
+};
+
+// ============================================================================
+// FULLSCREEN VIEWER
+// ============================================================================
+
+const fullscreen = {
+    open(index) {
+        state.currentIndex = index;
+        fullscreen.updateView();
+        DOM.fullscreenContainer.style.display = "flex";
+    },
+
+    close() {
+        DOM.fullscreenContainer.style.display = "none";
+    },
+
+    updateView() {
+        const data = state.currentImages[state.currentIndex];
+        if (!data) return;
+
+        DOM.fullscreenImg.src = `/serve_image/${data.filename}`;
+
+        DOM.fullscreenPrompt.dataset.prompt = data.metadata.prompt;
+        DOM.fullscreenPrompt.textContent = data.metadata.prompt || "";
+
+        const miniCheckbox = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`);
+        const isChecked = miniCheckbox ? miniCheckbox.checked : !!data.metadata.checked;
+
+        DOM.fullscreenCheckbox.dataset.filename = data.filename;
+        DOM.fullscreenCheckbox.checked = isChecked;
+
+        const wrapper = document.querySelector(".fullscreen-image-wrapper");
+        wrapper?.classList.toggle("checked", isChecked);
+
+        DOM.fullscreenTags.value = (data.metadata.tags || []).join(", ");
+        DOM.fullscreenTagsDisplay.innerHTML = "";
+        tags.renderPills(data.metadata.tags || []);
+
+        fullscreen.setupCheckboxHandler(data, miniCheckbox, wrapper);
+        fullscreen.setupRatingHandler(data);
+    },
+
+    setupCheckboxHandler(data, miniCheckbox, wrapper) {
+        DOM.fullscreenCheckbox.onchange = function() {
+            const checked = DOM.fullscreenCheckbox.checked;
+            data.metadata.checked = checked;
+            wrapper?.classList.toggle("checked", checked);
+
+            if (miniCheckbox) {
+                miniCheckbox.checked = checked;
+                const container = miniCheckbox.closest(".image-container");
+                if (container) {
+                    container.classList.toggle("checked", checked);
+                }
+            }
+
+            utils.apiRequest("/update_metadata", {
+                body: JSON.stringify({ filename: data.filename, checked })
             }).catch(console.error);
         };
-    });
+    },
 
-}
+    setupRatingHandler(data) {
+        if (!DOM.fullscreenRating) return;
 
-function prevImage() {
-    if (currentIndex > 0) {
-        currentIndex--;
-        updateFullscreenView();
-    }
-}
+        const stars = DOM.fullscreenRating.querySelectorAll(".star");
+        const currentRating = data.metadata.rating || 0;
 
-async function nextImage() {
-    if (++currentIndex >= currentImages.length) {
-        await loadMoreImages();
-    }
-    if (currentIndex < currentImages.length) {
-        updateFullscreenView();
-    }
-}
+        stars.forEach(star => {
+            const starRating = parseInt(star.dataset.rating);
+            star.textContent = starRating <= currentRating ? STARRED_SYMBOL : UNSTARRED_SYMBOL;
+            star.classList.toggle("selected", starRating <= currentRating);
 
-function copyToClipboard(event, text) {
-    event.stopPropagation();
-    navigator.clipboard.writeText(text);
-}
+            star.onclick = function(e) {
+                e.stopPropagation();
+                
+                // Обновляем метаданные в состоянии
+                data.metadata.rating = starRating;
+                
+                // Обновляем метаданные в массиве currentImages
+                const img = state.currentImages.find(i => i.filename === data.filename);
+                if (img) {
+                    img.metadata.rating = starRating;
+                }
 
-function copyPromptFullscreen() {
-    const prompt = document.getElementById('fullscreen-prompt').dataset.prompt;
-    if (prompt) navigator.clipboard.writeText(prompt);
-}
+                // Обновляем визуальное отображение в fullscreen
+                stars.forEach(s => {
+                    const r = parseInt(s.dataset.rating);
+                    s.textContent = r <= starRating ? STARRED_SYMBOL : UNSTARRED_SYMBOL;
+                    s.classList.toggle("selected", r <= starRating);
+                });
 
-function rebindFullscreenIndices() {
-    const containers = document.querySelectorAll("#gallery .image-container");
-    containers.forEach((container, i) => {
-        container.setAttribute("onclick", `openFullscreen(${i})`);
-    });
-}
+                // Обновляем визуальное отображение в галерее
+                rating.updateStars(null, data.filename, starRating);
 
-function deleteFullscreen() {
-    const data = currentImages[currentIndex];
-    if (!data || !confirm("Удалить изображение?")) return;
+                // Сохраняем на сервере
+                utils.apiRequest("/update_metadata", {
+                    body: JSON.stringify({ filename: data.filename, rating: starRating })
+                }).then(() => {
+                    console.log("✅ Рейтинг сохранен:", starRating);
+                }).catch(error => {
+                    console.error("❌ Ошибка сохранения рейтинга:", error);
+                });
+            };
+        });
+    },
 
-    fetch("/delete_image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: data.filename })
-    })
-    .then(res => res.json())
-    .then(async result => {
-        if (result.success) {
-            // Удаляем миниатюру
-            const thumb = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`)?.closest(".image-container");
-            if (thumb) thumb.remove();
+    prev() {
+        if (state.currentIndex > 0) {
+            state.currentIndex--;
+            fullscreen.updateView();
+        }
+    },
 
-            // Удаляем из массива
-            currentImages.splice(currentIndex, 1);
-            rebindFullscreenIndices();
+    async next() {
+        if (++state.currentIndex >= state.currentImages.length) {
+            await gallery.loadMore();
+        }
+        if (state.currentIndex < state.currentImages.length) {
+            fullscreen.updateView();
+        }
+    },
 
-            // Переход к следующему изображению или закрыть, если всё удалено
-            if (currentImages.length === 0) {
-                closeFullscreen();
-            } else if (currentIndex >= currentImages.length) {
-                currentIndex = currentImages.length - 1;
-                updateFullscreenView();
+    async delete() {
+        const data = state.currentImages[state.currentIndex];
+        if (!data || !confirm("Удалить изображение?")) return;
+
+        try {
+            const result = await utils.apiRequest("/delete_image", {
+                body: JSON.stringify({ filename: data.filename })
+            });
+
+            if (result.success) {
+                const thumb = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`)?.closest(".image-container");
+                thumb?.remove();
+
+                state.currentImages.splice(state.currentIndex, 1);
+                gallery.rebindIndices();
+
+                if (state.currentImages.length === 0) {
+                    fullscreen.close();
+                } else if (state.currentIndex >= state.currentImages.length) {
+                    state.currentIndex = state.currentImages.length - 1;
+                    fullscreen.updateView();
+                } else {
+                    fullscreen.updateView();
+                }
             } else {
-                updateFullscreenView();
+                alert("Ошибка удаления: " + (result.error || "неизвестная"));
             }
-        } else {
-            alert("Ошибка удаления: " + (result.error || "неизвестная"));
+        } catch (error) {
+            alert("Ошибка удаления: " + error);
         }
-    });
-}
+    },
 
-// --- Checkbox and Rating ---
-function saveCheckboxState(event) {
-    const cb = event.target;
-    fetch("/update_metadata", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: cb.dataset.filename, checked: cb.checked })
-    }).catch(console.error);
-}
+    copyPrompt() {
+        const prompt = DOM.fullscreenPrompt.dataset.prompt;
+        if (prompt) {
+            navigator.clipboard.writeText(prompt).catch(console.error);
+        }
+    }
+};
 
-function loadCheckboxState() {
-    document.querySelectorAll(".image-checkbox").forEach(cb => {
-        const img = currentImages.find(i => i.filename === cb.dataset.filename);
-        if (img) cb.checked = !!img.metadata.checked;
-    });
-    updateImageOpacity();
-}
+// ============================================================================
+// RATING
+// ============================================================================
 
-function updateImageOpacity() {
-    document.querySelectorAll(".image-checkbox").forEach(cb => {
-        const container = cb.closest(".image-container");
+const rating = {
+    set(event, filename, ratingValue) {
+        event.stopPropagation();
+        const img = state.currentImages.find(i => i.filename === filename);
+        if (img) {
+            img.metadata.rating = ratingValue;
+        }
+
+        rating.updateStars(null, filename, ratingValue);
+
+        utils.apiRequest("/update_metadata", {
+            body: JSON.stringify({ filename, rating: ratingValue })
+        }).then(() => {
+            console.log("✅ Рейтинг сохранен:", ratingValue, "для", filename);
+        }).catch(error => {
+            console.error("❌ Ошибка сохранения рейтинга:", error);
+        });
+    },
+
+    updateStars(event, filename, ratingValue) {
+        if (event) event.stopPropagation();
+        document.querySelectorAll(`.star[data-filename='${filename}']`).forEach(star => {
+            star.textContent = star.dataset.rating <= ratingValue ? STARRED_SYMBOL : UNSTARRED_SYMBOL;
+        });
+    },
+
+    showStars(event) {
+        event.currentTarget.querySelector(".image-rating").style.opacity = "1";
+    },
+
+    hideStars(event) {
+        event.currentTarget.querySelector(".image-rating").style.opacity = "0";
+    }
+};
+
+// ============================================================================
+// TAGS
+// ============================================================================
+
+const tags = {
+    async fetchAll() {
+        try {
+            const res = await fetch("/all_tags");
+            state.allTags = await res.json();
+        } catch (err) {
+            console.error("Ошибка загрузки тегов:", err);
+        }
+    },
+
+    renderPills(tags) {
+        DOM.fullscreenTagsDisplay.innerHTML = "";
+
+        tags.forEach(tag => {
+            const span = document.createElement("span");
+            span.className = "tag-pill";
+            span.textContent = tag;
+            span.onclick = () => {
+                DOM.searchBox.value = `t:${tag}`;
+                gallery.filter();
+                fullscreen.close();
+            };
+            DOM.fullscreenTagsDisplay.appendChild(span);
+        });
+    },
+
+    async save() {
+        const tagList = DOM.fullscreenTags.value.split(",").map(t => t.trim()).filter(Boolean);
+        const data = state.currentImages[state.currentIndex];
+        if (!data) return;
+
+        data.metadata.tags = tagList;
+
+        const container = document.querySelector(`.image-container [data-filename="${data.filename}"]`)?.closest(".image-container");
         if (container) {
-            container.classList.toggle("checked", cb.checked);
+            const imgEl = container.querySelector("img");
+            if (imgEl) {
+                const prompt = utils.escapeJS(data.metadata.prompt);
+                const seed = utils.escapeJS(utils.extractSeed(data.filename));
+                const tagsJson = utils.sanitizeTagsJSON(tagList);
+                imgEl.setAttribute("onmouseenter", `tooltip.show(event, '${prompt}', '${seed}', ${tagsJson})`);
+            }
         }
-    });
-}
 
-function setRating(event, filename, rating) {
-    event.stopPropagation();
-    const img = currentImages.find(i => i.filename === filename);
-    if (img) img.metadata.rating = rating;
-    updateStars(null, filename, rating);
+        tagList.forEach(tag => {
+            if (!state.allTags.includes(tag)) {
+                state.allTags.push(tag);
+            }
+        });
 
-    fetch("/update_metadata", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, rating })
-    }).catch(console.error);
-}
-
-function updateStars(event, filename, rating) {
-    if (event) event.stopPropagation();
-    document.querySelectorAll(`.star[data-filename='${filename}']`).forEach(star => {
-        star.textContent = star.dataset.rating <= rating ? "★" : "☆";
-    });
-}
-
-function showStars(event) {
-    event.currentTarget.querySelector(".image-rating").style.opacity = "1";
-}
-
-function hideStars(event) {
-    event.currentTarget.querySelector(".image-rating").style.opacity = "0";
-}
-
-// --- Tags ---
-function renderFullscreenTagPills(tags) {
-    const display = document.getElementById("fullscreen-tags-display");
-    display.innerHTML = "";
-
-    tags.forEach(tag => {
-        const span = document.createElement("span");
-        span.className = "tag-pill";
-        span.textContent = tag;
-        span.onclick = () => {
-            document.getElementById("search-box").value = "t:" + tag;
-            filterImages();
-            closeFullscreen();
-        };
-        display.appendChild(span);
-    });
-}
-
-function saveTags() {
-    const input = document.getElementById("fullscreen-tags");
-    const tags = input.value.split(",").map(t => t.trim()).filter(Boolean);
-    const data = currentImages[currentIndex];
-    if (!data) return;
-
-    data.metadata.tags = tags;
-    const container = document.querySelector(`.image-container [data-filename="${data.filename}"]`)?.closest(".image-container");
-    if (container) {
-        const imgEl = container.querySelector("img");
-        if (imgEl) {
-            const prompt = escapeJS(data.metadata.prompt);
-            const seed = escapeJS(extractSeed(data.filename));
-            const tagsJson = JSON.stringify(tags)
-                .replace(/\\/g, "\\\\")
-                .replace(/'/g, "\\'")
-                .replace(/</g, "\\u003c")
-                .replace(/>/g, "\\u003e");
-            imgEl.setAttribute("onmouseenter", `showTooltip(event, '${prompt}', '${seed}', ${tagsJson})`);
+        try {
+            await utils.apiRequest("/update_metadata", {
+                body: JSON.stringify({ filename: data.filename, tags: tagList })
+            });
+            console.log("✅ Теги обновлены:", tagList);
+        } catch (error) {
+            console.error("Failed to save tags:", error);
         }
-    }
 
-    // Обновим allTags, если были новые
-    tags.forEach(tag => {
-        if (!allTags.includes(tag)) {
-            allTags.push(tag);
-        }
-    });
+        tags.renderPills(tagList);
+        tags.showSavedIndicator();
+        DOM.fullscreenTags.focus();
+    },
 
-    fetch("/update_metadata", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: data.filename, tags })
-    }).then(() => {
-        console.log("✅ Теги обновлены:", tags);
-    }).catch(console.error);
+    showSavedIndicator() {
+        if (!DOM.tagsSavedIndicator) return;
 
-    renderFullscreenTagPills(tags);
+        DOM.tagsSavedIndicator.classList.remove("hidden");
+        DOM.tagsSavedIndicator.classList.add("visible");
 
-    const indicator = document.getElementById("tags-saved-indicator");
-    if (indicator) {
-        indicator.classList.remove("hidden");
-        indicator.classList.add("visible");
         setTimeout(() => {
-            indicator.classList.remove("visible");
-            indicator.classList.add("hidden");
-        }, 1000);
-    }
+            DOM.tagsSavedIndicator.classList.remove("visible");
+            DOM.tagsSavedIndicator.classList.add("hidden");
+        }, TAG_SAVED_INDICATOR_DELAY);
+    },
 
-    input.focus();
-}
+    closeSuggestions() {
+        document.querySelector(".tag-suggestion-container")?.remove();
+    },
 
-async function fetchAllTags() {
-    try {
-        const res = await fetch('/all_tags');
-        allTags = await res.json();
-    } catch (err) {
-        console.error("Ошибка загрузки тегов:", err);
-    }
-}
+    handleInput() {
+        const value = DOM.fullscreenTags.value.split(",").pop().trim().toLowerCase();
+        tags.closeSuggestions();
 
-const tagsInput = document.getElementById("fullscreen-tags");
+        if (!value) return;
 
-tagsInput.addEventListener("input", () => {
-    const value = tagsInput.value.split(",").pop().trim().toLowerCase();
-    closeTagSuggestions();
+        const suggestions = state.allTags
+            .filter(tag => tag.toLowerCase().startsWith(value))
+            .slice(0, MAX_TAG_SUGGESTIONS);
 
-    if (!value) return;
+        if (!suggestions.length) return;
 
-    const suggestions = allTags.filter(tag => tag.toLowerCase().startsWith(value)).slice(0, 10);
+        const container = document.createElement("div");
+        container.className = "tag-suggestion-container";
 
-    const container = document.createElement("div");
-    container.className = "tag-suggestion-container";
+        suggestions.forEach(tag => {
+            const div = document.createElement("div");
+            div.className = "tag-suggestion";
+            div.innerHTML = `<strong>${tag.slice(0, value.length)}</strong>${tag.slice(value.length)}`;
+            div.onclick = () => {
+                const parts = DOM.fullscreenTags.value.split(",");
+                parts[parts.length - 1] = tag;
+                DOM.fullscreenTags.value = parts.join(", ") + ", ";
+                tags.closeSuggestions();
+                DOM.fullscreenTags.focus();
+            };
+            container.appendChild(div);
+        });
 
-    suggestions.forEach(tag => {
-        const div = document.createElement("div");
-        div.className = "tag-suggestion";
-        div.innerHTML = `<strong>${tag.slice(0, value.length)}</strong>${tag.slice(value.length)}`;
-        div.onclick = () => {
-            const parts = tagsInput.value.split(",");
-            parts[parts.length - 1] = tag;
-            tagsInput.value = parts.join(", ") + ", ";
-            closeTagSuggestions();
-            tagsInput.focus();
-        };
-        container.appendChild(div);
-    });
+        state.suggestionIndex = -1;
+        DOM.fullscreenTags.parentNode.appendChild(container);
+    },
 
-    suggestionIndex = -1;
+    handleKeydown(e) {
+        const container = document.querySelector(".tag-suggestion-container");
+        const items = container ? container.querySelectorAll(".tag-suggestion") : [];
 
-    tagsInput.parentNode.appendChild(container);
-});
+        // Обработка Enter должна работать всегда
+        if (e.key === "Enter") {
+            if (container && items.length && state.suggestionIndex >= 0 && state.suggestionIndex < items.length) {
+                // Если есть выбранное предложение - выбрать его
+                e.preventDefault();
+                items[state.suggestionIndex].click();
+            } else {
+                // Если нет предложений или ничего не выбрано - сохранить теги
+                e.preventDefault();
+                tags.save();
+            }
+            return;
+        }
 
-tagsInput.addEventListener("blur", () => {
-    setTimeout(closeTagSuggestions, 150); // задержка, чтобы клик по подсказке успел сработать
-});
+        // Escape и Backspace+Ctrl работают без контейнера
+        if (e.key === "Escape") {
+            if (container) {
+                tags.closeSuggestions();
+            }
+            return;
+        }
 
-tagsInput.addEventListener("keydown", e => {
-    const container = document.querySelector(".tag-suggestion-container");
-    if (!container) return;
-
-    const items = container.querySelectorAll(".tag-suggestion");
-    if (!items.length) return;
-
-    if (e.key === "ArrowDown") {
-        e.preventDefault();
-        suggestionIndex = (suggestionIndex + 1) % items.length;
-    } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        suggestionIndex = (suggestionIndex - 1 + items.length) % items.length;
-    } else if (e.key === "Enter") {
-        if (suggestionIndex >= 0 && suggestionIndex < items.length) {
+        if (e.key === "Backspace" && e.ctrlKey) {
             e.preventDefault();
-            items[suggestionIndex].click();
-        }
-    } else if (e.key === "Escape") {
-        closeTagSuggestions();
-    } else if (e.key === "Backspace" && e.ctrlKey) {
-        e.preventDefault();
-        const pos = tagsInput.selectionStart;
-        const before = tagsInput.value.slice(0, pos);
-        const after = tagsInput.value.slice(tagsInput.selectionEnd);
-        const lastComma = before.lastIndexOf(",");
+            const pos = DOM.fullscreenTags.selectionStart;
+            const before = DOM.fullscreenTags.value.slice(0, pos);
+            const after = DOM.fullscreenTags.value.slice(DOM.fullscreenTags.selectionEnd);
+            const lastComma = before.lastIndexOf(",");
 
-        let newBefore;
-        if (lastComma >= 0) {
-            newBefore = before.slice(0, lastComma).replace(/\s+$/, "");
-        } else {
-            newBefore = ""; // если вообще нет запятой — удаляем всё
+            const newBefore = lastComma >= 0
+                ? before.slice(0, lastComma).replace(/\s+$/, "")
+                : "";
+
+            DOM.fullscreenTags.value = newBefore + after;
+            const newPos = newBefore.length;
+            DOM.fullscreenTags.setSelectionRange(newPos, newPos);
+            return;
         }
 
-        tagsInput.value = newBefore + after;
-        const newPos = newBefore.length;
-        tagsInput.setSelectionRange(newPos, newPos);
+        // Остальные клавиши работают только если есть контейнер с предложениями
+        if (!container || !items.length) return;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            state.suggestionIndex = (state.suggestionIndex + 1) % items.length;
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            state.suggestionIndex = (state.suggestionIndex - 1 + items.length) % items.length;
+        }
+
+        // Подсветка активного предложения
+        items.forEach((el, i) => {
+            el.classList.toggle("active", i === state.suggestionIndex);
+        });
     }
+};
 
-    // подсветка активного
-    items.forEach((el, i) => {
-        el.classList.toggle("active", i === suggestionIndex);
-    });
-});
+// ============================================================================
+// CLIPBOARD
+// ============================================================================
 
-
-function closeTagSuggestions() {
-    const existing = document.querySelector(".tag-suggestion-container");
-    if (existing) existing.remove();
-}
-
-
-// --- Deletion ---
-async function deleteThumbnail(event, filename) {
-    event.stopPropagation();
-    if (!confirm("Удалить изображение?")) return;
-
-    const response = await fetch("/delete_image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename })
-    });
-    const result = await response.json();
-    if (result.success) {
-        event.target.closest(".image-container").remove();
-    } else {
-        alert("Ошибка удаления: " + (result.error || "неизвестная"));
+const clipboard = {
+    copy(event, text) {
+        event.stopPropagation();
+        navigator.clipboard.writeText(text).catch(console.error);
     }
-}
+};
 
-// --- Copy To Favorites ---
-function copyToFavorites(event, filename) {
-    event.stopPropagation();
-    fetch("/copy_to_favorites", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename })
-    })
-    .then(res => res.json())
-    .then(result => {
-        if (result.success) {
-            console.log(`✅ Скопировано в "favorites": ${filename}`);
-        } else {
-            alert("Ошибка копирования: " + (result.error || "неизвестная"));
+// ============================================================================
+// FAVORITES
+// ============================================================================
+
+const favorites = {
+    async copy(event, filename) {
+        event.stopPropagation();
+
+        try {
+            const result = await utils.apiRequest("/copy_to_favorites", {
+                body: JSON.stringify({ filename })
+            });
+
+            if (result.success) {
+                console.log(`✅ Скопировано в "favorites": ${filename}`);
+            } else {
+                alert("Ошибка копирования: " + (result.error || "неизвестная"));
+            }
+        } catch (err) {
+            alert("Ошибка соединения: " + err);
         }
-    })
-    .catch(err => {
-        alert("Ошибка соединения: " + err);
-    });
-}
+    },
 
-function copyToFavoritesFullscreen() {
-    const data = currentImages[currentIndex];
-    if (!data) return;
-    copyToFavorites({ stopPropagation: () => {} }, data.filename);
-}
+    copyFromFullscreen() {
+        const data = state.currentImages[state.currentIndex];
+        if (!data) return;
+        favorites.copy({ stopPropagation: () => {} }, data.filename);
+    }
+};
 
+// ============================================================================
+// UI CONTROLS
+// ============================================================================
 
-// --- UI Events ---
-function changeSort() {
-    sortBy = document.getElementById("sort-select").value;
-    loadImages();
-}
+const ui = {
+    changeSort() {
+        state.sortBy = DOM.sortSelect.value;
+        gallery.load();
+    },
 
-function toggleFolder(event) {
-    event.stopPropagation();
-    const item = event.currentTarget.closest(".folder-item");
-    const children = item.querySelector(".folder-children");
-    const expanded = item.classList.toggle("expanded");
-    children.classList.toggle("hidden", !expanded);
-}
+    scrollToTop() {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    },
 
-function updateToggleButtonPosition() {
-    const btn = document.getElementById("menu-toggle");
-    const icon = document.getElementById("menu-icon");
+    updateToggleButtonPosition() {
+        const isVisible = document.body.classList.contains("sidebar-visible");
+        DOM.menuToggle.style.left = isVisible ? "220px" : "10px";
+        DOM.menuIcon.textContent = isVisible ? "⯇" : "⯈";
+    },
 
-    const isVisible = document.body.classList.contains("sidebar-visible");
-    btn.style.left = isVisible ? "220px" : "10px";
-    icon.textContent = isVisible ? "⯇" : "⯈";
-}
+    toggleSidebar() {
+        document.body.classList.toggle("sidebar-visible");
+        ui.updateToggleButtonPosition();
+    }
+};
 
-// --- Init ---
-window.onload = function () {
+// ============================================================================
+// KEYBOARD HANDLERS
+// ============================================================================
+
+const keyboard = {
+    handleKeydown(e) {
+        const isFullscreen = DOM.fullscreenContainer.style.display === "flex";
+        const isTagInputFocused = document.activeElement === DOM.fullscreenTags;
+
+        if (isFullscreen) {
+            keyboard.handleFullscreenKeys(e, isTagInputFocused);
+        }
+
+        keyboard.handleCopyShortcut(e, isFullscreen, isTagInputFocused);
+    },
+
+    handleFullscreenKeys(e, isTagInputFocused) {
+        if (!isTagInputFocused) {
+            if (e.key === "ArrowLeft") fullscreen.prev();
+            if (e.key === "ArrowRight") fullscreen.next();
+            if (e.key === "Delete") fullscreen.delete();
+            if (e.key === "Escape") fullscreen.close();
+        } else if (e.key === "Escape") {
+            // Если фокус на input тегов, Escape просто убирает фокус
+            DOM.fullscreenTags.blur();
+        }
+        // Остальные клавиши для input тегов обрабатываются в tags.handleKeydown
+    },
+
+    handleCopyShortcut(e, isFullscreen, isTagInputFocused) {
+        if (!e.ctrlKey || (e.key.toLowerCase() !== "c" && e.key.toLowerCase() !== "с")) return;
+
+        const selection = window.getSelection();
+        const isTextSelected = selection && selection.toString().length > 0;
+
+        if (isTagInputFocused && isTextSelected) return;
+
+        if (isFullscreen) {
+            fullscreen.copyPrompt();
+        } else {
+            tooltip.copyText();
+        }
+    }
+};
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+const contentLoader = {
+    async load() {
+        await navigation.loadContent();
+    }
+};
+
+// Global functions for HTML onclick handlers
+window.updateUrl = navigation.updateUrl;
+window.loadContent = contentLoader.load;
+window.filterImages = gallery.filter;
+window.changeSort = ui.changeSort;
+window.toggleFolder = folders.toggle;
+window.scrollToTop = ui.scrollToTop;
+window.uncheckAllCheckboxes = gallery.uncheckAll;
+window.openFullscreen = fullscreen.open;
+window.closeFullscreen = fullscreen.close;
+window.prevImage = fullscreen.prev;
+window.nextImage = fullscreen.next;
+window.deleteFullscreen = fullscreen.delete;
+window.copyPromptFullscreen = fullscreen.copyPrompt;
+window.copyToClipboard = clipboard.copy;
+window.copyToFavorites = favorites.copy;
+window.copyToFavoritesFullscreen = favorites.copyFromFullscreen;
+window.deleteThumbnail = gallery.deleteThumbnail;
+window.setRating = rating.set;
+window.showStars = rating.showStars;
+window.hideStars = rating.hideStars;
+window.showTooltip = tooltip.show;
+window.updateTooltipPosition = tooltip.updatePosition;
+window.hideTooltip = tooltip.hide;
+window.saveTags = tags.save;
+
+window.onload = function() {
     const saved = localStorage.getItem("galleryState");
     if (saved) {
         try {
             const state = JSON.parse(saved);
             if (state.currentPath && state.currentPath !== "/") {
-                window.history.replaceState({}, '', state.currentPath);
+                window.history.replaceState({}, "", state.currentPath);
             }
             if (typeof state.sidebarVisible === "boolean") {
-                const sidebar = document.getElementById("sidebar");
-                const container = document.querySelector(".container");
-                sidebar.classList.toggle("hidden", !state.sidebarVisible);
-                container.classList.toggle("sidebar-visible", state.sidebarVisible);
+                DOM.sidebar.classList.toggle("hidden", !state.sidebarVisible);
+                document.querySelector(".container")?.classList.toggle("sidebar-visible", state.sidebarVisible);
             }
         } catch (e) {
             console.warn("Ошибка восстановления пути:", e);
         }
     }
 
-    loadContent();
+    contentLoader.load();
+    DOM.scrollToTop.classList.add("hidden");
 
-    document.getElementById("scroll-to-top").classList.add("hidden");
-
-    document.getElementById("menu-toggle").addEventListener("click", () => {
-        document.body.classList.toggle("sidebar-visible");
-        updateToggleButtonPosition();
-    });
+    DOM.menuToggle.addEventListener("click", ui.toggleSidebar);
 
     document.querySelectorAll(".folder-row").forEach(row => {
         if (row.dataset.hasChildren === "true") {
-            row.addEventListener("click", toggleFolder);
+            row.addEventListener("click", folders.toggle);
         }
     });
 
     window.addEventListener("scroll", () => {
-        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) loadMoreImages();
-        document.getElementById("scroll-to-top").classList.toggle("hidden", window.scrollY <= 300);
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - SCROLL_THRESHOLD) {
+            gallery.loadMore();
+        }
+        DOM.scrollToTop.classList.toggle("hidden", window.scrollY <= SCROLL_TO_TOP_THRESHOLD);
     });
 
-    window.addEventListener("beforeunload", saveGalleryState);
+    window.addEventListener("beforeunload", stateManager.save);
 
-    document.getElementById("gallery").addEventListener("mouseleave", hideTooltip);
-    document.getElementById("gallery").addEventListener("mousemove", e => {
-        if (tooltip.style.display === "block") updateTooltipPosition(e);
+    DOM.gallery.addEventListener("mouseleave", tooltip.hide);
+    DOM.gallery.addEventListener("mousemove", e => {
+        if (DOM.tooltip.style.display === "block") {
+            tooltip.updatePosition(e);
+        }
     });
 
     document.addEventListener("change", e => {
         if (e.target.classList.contains("image-checkbox")) {
-            saveCheckboxState(e);
-            updateImageOpacity();
+            gallery.saveCheckboxState(e);
+            gallery.updateImageOpacity();
         }
     });
 
-    document.addEventListener("keydown", e => {
-        const isFullscreen = document.getElementById("fullscreen-container").style.display === "flex";
-        const tagInput = document.getElementById("fullscreen-tags");
-        const isTagInputFocused = document.activeElement === tagInput;
+    document.addEventListener("keydown", keyboard.handleKeydown);
 
-        if (isFullscreen) {
-            if (!isTagInputFocused) {
-                if (e.key === "ArrowLeft") prevImage();
-                if (e.key === "ArrowRight") nextImage();
-                if (e.key === "Delete") deleteFullscreen();
-            }
-            if (e.key === "Escape") {
-                if (isTagInputFocused) {
-                    tagInput.blur();
-                } else {
-                    closeFullscreen();
-                }
-            }
-
-
-            if (isTagInputFocused) {
-                const suggestionBox = document.querySelector(".tag-suggestion-container");
-                const suggestions = suggestionBox?.querySelectorAll(".tag-suggestion") || [];
-
-                if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    suggestionIndex = (suggestionIndex + 1) % suggestions.length;
-                } else if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
-                } else if (e.key === "Escape") {
-                    closeTagSuggestions();
-                    suggestionIndex = -1;
-                } else if (e.key === "Enter") {
-                    if (suggestionIndex >= 0 && suggestionIndex < suggestions.length) {
-                        e.preventDefault();
-                        suggestions[suggestionIndex].click(); // вставит тег, но НЕ сохранит
-                        return;
-                    }
-                    e.preventDefault();
-                    saveTags(); // обычный Enter, когда подсказок нет
-                }
-
-                // Подсветка активного
-                suggestions.forEach((el, i) => {
-                    el.classList.toggle("active", i === suggestionIndex);
-                });
-            }
-        }
-
-        if (e.ctrlKey && (e.key.toLowerCase() === "c" || e.key.toLowerCase() === "с")) {
-            const selection = window.getSelection();
-            const isTextSelected = selection && selection.toString().length > 0;
-
-            // Если фокус на поле ввода и есть выделенный текст — ничего не перехватываем
-            if (isTagInputFocused && isTextSelected) return;
-
-            // Иначе применяем поведение как раньше
-            isFullscreen ? copyPromptFullscreen() : copyTooltipText();
-        }
-    });
-
-    document.getElementById("fullscreen-container").addEventListener("click", e => {
+    DOM.fullscreenContainer.addEventListener("click", e => {
         const isOutside = !e.target.closest(".fullscreen-image-wrapper")
             && !e.target.closest(".nav-arrow")
             && !e.target.closest(".tag-suggestion-container");
-        if (isOutside) closeFullscreen();
+        if (isOutside) fullscreen.close();
     });
 
-    updateToggleButtonPosition();
+    DOM.fullscreenTags.addEventListener("input", tags.handleInput);
+    DOM.fullscreenTags.addEventListener("blur", () => {
+        setTimeout(tags.closeSuggestions, TAG_SUGGESTION_BLUR_DELAY);
+    });
+    DOM.fullscreenTags.addEventListener("keydown", tags.handleKeydown);
+
+    ui.updateToggleButtonPosition();
 };
 
 window.onpopstate = () => {
-    loadContent();
-    loadCheckboxState();
-    document.getElementById("scroll-to-top").classList.add("hidden");
+    contentLoader.load();
+    gallery.loadCheckboxState();
+    DOM.scrollToTop.classList.add("hidden");
 };
