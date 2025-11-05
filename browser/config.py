@@ -8,7 +8,6 @@ CONFIG_FILE = "config.json"
 DEFAULT_CONFIG = {
     "image_folder": "static/images",
     "favorites_folder": "static/images/favorites",
-    "images_per_row": 5,
     "thumbnail_size": 512,
     "items_per_page": 20,
     "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp"]
@@ -38,7 +37,6 @@ def load_config():
     loaded_config.IMAGE_FOLDER = os.path.abspath(loaded_config["image_folder"])
     loaded_config.FAVORITES_FOLDER = os.path.abspath(loaded_config["favorites_folder"])
     loaded_config.ALLOWED_EXTENSIONS = set(loaded_config["allowed_extensions"])
-    loaded_config.IMAGES_PER_ROW = int(loaded_config["images_per_row"])
     loaded_config.THUMBNAIL_SIZE = int(loaded_config["thumbnail_size"])
     loaded_config.ITEMS_PER_PAGE = int(loaded_config["items_per_page"])
     loaded_config.AUTO_TAGS = set(loaded_config.get("auto_tags", []))

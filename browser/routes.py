@@ -22,8 +22,7 @@ def index(subpath=""):
         return jsonify({"error": "Path not exist"}), 404
     return render_template(
         "index.html",
-        folder_tree=build_folder_tree(config.IMAGE_FOLDER),
-        images_per_row=config.IMAGES_PER_ROW
+        folder_tree=build_folder_tree(config.IMAGE_FOLDER)
     )
 
 def parse_scope_and_query(search: str):
@@ -154,7 +153,6 @@ def get_all_tags():
 @routes.route("/uncheck_all", methods=["POST"])
 def uncheck_all():
     """Uncheck all images in the given folder (or globally) matching the search query."""
-    
     if not request.is_json:
         logger.error("Request is not JSON")
         return jsonify({"error": "Request must be JSON"}), 400

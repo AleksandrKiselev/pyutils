@@ -33,15 +33,15 @@ def extract_seed(image_path):
     return os.path.splitext(base)[0]
 
 def auto_add_tags_from_prompt(image_path, metadata, threshold=0.90):
-    """Automatically add tags to metadata based on prompt and image properties."""
+    """Automatically add tags to metadata based on prompt and image properties (accelerated)."""
     tag_list = config.AUTO_TAGS
     prompt_lower = metadata.get("prompt", "").lower()
-    prompt_tokens = re.split(r"[.,:]", prompt_lower)
 
+    # Weak tokenization and normalization up front (faster set logic, less difflib)
+    # 1. Precompute a normalized set of all prompt "words"/pseudo-words (via regex)
     def normalize(text):
         text = unicodedata.normalize("NFKC", text.lower())
         text = text.strip(' \t\n"\'')
-        # Replace special characters and normalize whitespace
         text = text.replace("-", " ").replace("_", " ")
         text = text.replace("’", "'").replace("`", "'")
         text = text.replace("“", '"').replace("”", '"')
@@ -49,28 +49,50 @@ def auto_add_tags_from_prompt(image_path, metadata, threshold=0.90):
         text = re.sub(r"[.,!?;:(){}\[\]]", "", text)
         text = re.sub(r"\s+", " ", text)
         return text.strip()
+    # Preprocess prompt: split on whitespace *after* removing delimiters so multi-word tags work better
+    prompt_clean = normalize(prompt_lower)
+    prompt_token_set = set(prompt_clean.split())
 
-    def check_tag(tag):
-        tag_lower = tag.lower()
-        if tag_lower in prompt_lower:
+    prompt_tokens = re.split(r"[.,:]", prompt_lower)
+    normalized_tokens = [normalize(tok) for tok in prompt_tokens]
+
+    # Fast normalization for tags
+    normalized_tags = [(tag, normalize(tag)) for tag in tag_list]
+
+    def check_tag(tag_tuple):
+        """Check if a tag matches the prompt (optimized version for parallel execution)."""
+        tag, tag_norm = tag_tuple
+        # Exact word match: check token set first (fast), then regex with word boundaries (prevents substring matches)
+        if tag_norm in prompt_token_set:
             return tag
-        for token in prompt_tokens:
-            if difflib.SequenceMatcher(None, normalize(token), normalize(tag_lower)).ratio() >= threshold:
-                return tag
+        # Check with word boundaries to avoid substring matches (e.g., "ass" in "assistant")
+        tag_escaped = re.escape(tag_norm)
+        if re.search(r'\b' + tag_escaped + r'\b', prompt_clean):
+            return tag
+        # Fuzzy match for typos: only match whole tokens, not substrings
+        for norm_tok in normalized_tokens:
+            # Only check if lengths are within reasonable ratio (skip e.g. empty token)
+            if not norm_tok or abs(len(norm_tok) - len(tag_norm)) > 8:
+                continue
+            # Use SequenceMatcher only when candidate length is reasonable
+            # Only match if lengths are similar (prevents "ass" matching "assistant")
+            if len(tag_norm) > 2 and len(norm_tok) >= len(tag_norm) * 0.7:
+                if difflib.SequenceMatcher(None, norm_tok, tag_norm).ratio() >= threshold:
+                    return tag
         return None
 
+    # Parallel processing of tags using thread pool
     with ThreadPoolExecutor() as executor:
-        results = executor.map(check_tag, tag_list)
+        results = executor.map(check_tag, normalized_tags)
 
     prompt_tags = {tag for tag in results if tag}
+
     auto_tags = set()
     auto_tags.update(get_image_tags(image_path))
     auto_tags.add(extract_seed(image_path))
-
     existing_tags = set(metadata.get("tags", []))
     combined = sorted(existing_tags.union(prompt_tags)) + list(auto_tags)
     metadata["tags"] = combined
-
 @lru_cache(maxsize=1)
 def get_all_tags_cached():
     """Return a sorted list of all unique tags from all metadata files."""

@@ -6,15 +6,13 @@ const LIMIT = 50;
 const TOOLTIP_OFFSET = 15;
 const TOOLTIP_HIDE_DELAY = 200;
 const TOOLTIP_FADE_DELAY = 100;
-const SCROLL_THRESHOLD = 200;
+const SCROLL_THRESHOLD = 800; // Порог для начала подгрузки изображений (в пикселях от конца страницы)
 const SCROLL_TO_TOP_THRESHOLD = 300;
 const STARRED_SYMBOL = "★";
 const UNSTARRED_SYMBOL = "☆";
-const MAX_TAG_SUGGESTIONS = 10;
-const TAG_SUGGESTION_BLUR_DELAY = 150;
 const MAX_RATING = 5;
 const COPY_CONFIRMATION_DELAY = 700;
-const TAG_SAVED_INDICATOR_DELAY = 1000;
+const AUTO_REFRESH_INTERVAL = 1000; // 1 секунда
 
 // ============================================================================
 // DOM ELEMENTS
@@ -34,10 +32,8 @@ const DOM = {
     fullscreenImg: document.getElementById("fullscreen-img"),
     fullscreenPrompt: document.getElementById("fullscreen-prompt"),
     fullscreenCheckbox: document.getElementById("fullscreen-checkbox"),
-    fullscreenTags: document.getElementById("fullscreen-tags"),
     fullscreenTagsDisplay: document.getElementById("fullscreen-tags-display"),
-    fullscreenRating: document.getElementById("fullscreen-rating"),
-    tagsSavedIndicator: document.getElementById("tags-saved-indicator")
+    fullscreenRating: document.getElementById("fullscreen-rating")
 };
 
 // ============================================================================
@@ -53,7 +49,9 @@ const state = {
     sortBy: "date-asc",
     allTags: [],
     suggestionIndex: -1,
-    tooltipTimeout: null
+    tooltipTimeout: null,
+    autoRefreshInterval: null,
+    lastUpdateTime: Date.now()
 };
 
 // ============================================================================
@@ -100,13 +98,13 @@ const utils = {
         try {
             console.log(`API request: ${endpoint}`, defaultOptions);
             const response = await fetch(endpoint, defaultOptions);
-            
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
                 console.error(`API request failed: ${endpoint}`, response.status, errorData);
                 throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error(`API request failed: ${endpoint}`, error);
@@ -126,7 +124,7 @@ const stateManager = {
             scrollY: window.scrollY,
             searchQuery: DOM.searchBox.value.trim(),
             sortBy: DOM.sortSelect.value,
-            sidebarVisible: !DOM.sidebar.classList.contains("hidden")
+            sidebarVisible: document.body.classList.contains("sidebar-visible")
         };
         localStorage.setItem("galleryState", JSON.stringify(state));
     },
@@ -146,11 +144,14 @@ const stateManager = {
             if (saved.sortBy) {
                 state.sortBy = saved.sortBy;
                 DOM.sortSelect.value = saved.sortBy;
+            } else {
+                // Если нет сохраненной сортировки, синхронизируем из DOM
+                state.sortBy = DOM.sortSelect.value;
             }
 
             if (typeof saved.sidebarVisible === "boolean") {
                 DOM.sidebar.classList.toggle("hidden", !saved.sidebarVisible);
-                document.querySelector(".container")?.classList.toggle("sidebar-visible", saved.sidebarVisible);
+                document.body.classList.toggle("sidebar-visible", saved.sidebarVisible);
             }
 
             setTimeout(() => {
@@ -171,6 +172,10 @@ const navigation = {
         event.preventDefault();
         if (window.location.pathname === `/${path}`) return;
 
+        // Сбрасываем состояние загрузки перед переключением
+        state.loading = false;
+        // Останавливаем автообновление при смене страницы
+        gallery.stopAutoRefresh();
         stateManager.save();
         window.history.pushState({}, '', `/${path}`);
         await contentLoader.load();
@@ -179,10 +184,15 @@ const navigation = {
 
     async loadContent() {
         DOM.loading.style.display = "block";
-        const path = window.location.pathname;
-        stateManager.restore();
-        await (path === "/" ? folders.load() : gallery.load());
-        DOM.loading.style.display = "none";
+        try {
+            const path = window.location.pathname;
+            stateManager.restore();
+            await (path === "/" ? folders.load() : gallery.load());
+        } catch (error) {
+            console.error("Failed to load content:", error);
+        } finally {
+            DOM.loading.style.display = "none";
+        }
         tags.fetchAll();
     }
 };
@@ -199,6 +209,8 @@ const folders = {
 
             if (incomingFolders) {
                 folderList.innerHTML = incomingFolders.innerHTML;
+                // Переустанавливаем обработчики событий после обновления HTML
+                folders.rebindEventHandlers();
                 folders.updateActiveHighlight();
             } else {
                 console.error("❌ sidebar-folders not found in response");
@@ -206,6 +218,15 @@ const folders = {
         } catch (error) {
             console.error("Failed to load folders:", error);
         }
+    },
+
+    rebindEventHandlers() {
+        // Переустанавливаем обработчики событий для папок после обновления HTML
+        document.querySelectorAll(".folder-row").forEach(row => {
+            if (row.dataset.hasChildren === "true") {
+                row.addEventListener("click", folders.toggle);
+            }
+        });
     },
 
     updateActiveHighlight() {
@@ -237,12 +258,30 @@ const folders = {
 
 const gallery = {
     async load() {
+        // Сбрасываем состояние загрузки перед началом
+        state.loading = false;
+        // Синхронизируем сортировку из DOM в state перед загрузкой (только если изменилась)
+        const currentSortBy = DOM.sortSelect.value;
+        if (currentSortBy !== state.sortBy) {
+            state.sortBy = currentSortBy;
+        }
         await folders.load();
         state.offset = 0;
         state.currentImages = [];
         DOM.gallery.innerHTML = "";
-        DOM.gallery.style.gridTemplateColumns = `repeat(${IMAGES_PER_ROW}, minmax(120px, 1fr))`;
+        // Скрываем индикатор после очистки галереи
+        if (DOM.loading.style.display === "block") {
+            DOM.loading.style.display = "none";
+        }
+        // Загружаем изображения
         await gallery.loadMore();
+        // Запускаем автообновление только для сортировки по убыванию даты
+        const [sort, order] = state.sortBy.split("-");
+        if (sort === "date" && order === "desc") {
+            gallery.startAutoRefresh();
+        } else {
+            gallery.stopAutoRefresh();
+        }
     },
 
     async loadMore(limit = LIMIT) {
@@ -270,10 +309,44 @@ const gallery = {
             });
 
             state.currentImages.push(...images);
-            DOM.gallery.insertAdjacentHTML("beforeend", gallery.renderCards(images));
+            const cardsHTML = gallery.renderCards(images);
+            DOM.gallery.insertAdjacentHTML("beforeend", cardsHTML);
+
+            // Сразу обновляем состояние чекбоксов и рейтингов, чтобы контент был виден
             gallery.loadCheckboxState();
             images.forEach(img => rating.updateStars(null, img.filename, img.metadata.rating || 0));
             state.offset += images.length;
+
+            // Предзагрузка изображений асинхронно, не блокируя отображение
+            // Используем requestIdleCallback для неблокирующей предзагрузки
+            const containers = DOM.gallery.querySelectorAll(".image-container:not(.image-loaded)");
+            if (containers.length > 0) {
+                const preloadImages = () => {
+                    Array.from(containers).forEach(container => {
+                        const img = container.querySelector("img");
+                        if (!img) return;
+
+                        if (img.complete) {
+                            container.classList.add("image-loaded");
+                        } else {
+                            img.onload = () => {
+                                container.classList.add("image-loaded");
+                            };
+                            img.onerror = () => {
+                                // Помечаем как загруженное даже при ошибке, чтобы не ждать бесконечно
+                                container.classList.add("image-loaded");
+                            };
+                        }
+                    });
+                };
+
+                // Используем requestIdleCallback если доступен, иначе setTimeout
+                if (window.requestIdleCallback) {
+                    requestIdleCallback(preloadImages, { timeout: 1000 });
+                } else {
+                    setTimeout(preloadImages, 0);
+                }
+            }
         } catch (error) {
             console.error("Failed to load images:", error);
         } finally {
@@ -294,15 +367,27 @@ const gallery = {
             const tagsJson = utils.sanitizeTagsJSON(img.metadata.tags || []);
             const ratingValue = img.metadata.rating || 0;
 
+            // Извлекаем разрешение из тегов для установки aspect-ratio
+            const tags = img.metadata.tags || [];
+            const resolutionTag = tags.find(tag => /^\d+x\d+$/.test(tag));
+            let aspectRatioStyle = "";
+            if (resolutionTag) {
+                const [width, height] = resolutionTag.split("x").map(Number);
+                if (width && height) {
+                    const aspectRatio = width / height;
+                    aspectRatioStyle = `style="aspect-ratio: ${aspectRatio};"`;
+                }
+            }
+
             return `
                 <div class="image-container" onclick="fullscreen.open(${state.offset + index})"
-                     onmouseenter="rating.showStars(event)" onmouseleave="rating.hideStars(event)">
+                     onmouseenter="rating.showStars(event)" onmouseleave="rating.hideStars(event)" ${aspectRatioStyle}>
                     <div class="image-buttons">
-                        <button class="copy-btn" onclick="clipboard.copy(event, '${prompt}')">📋</button>
-                        <button class="copy-favorites-btn" onclick="favorites.copy(event, '${filenameEscaped}')">⭐</button>
+                        <button class="copy-btn" onclick="clipboard.copy(event, '${prompt}')" title="Копировать промпт">⧉</button>
+                        <button class="copy-favorites-btn" onclick="favorites.copy(event, '${filenameEscaped}')" title="В избранное">★</button>
                         <input type="checkbox" class="image-checkbox" data-filename="${filenameAttrEscaped}"
-                               onclick="event.stopPropagation(); gallery.saveCheckboxState(event);">
-                        <button class="delete-btn" onclick="gallery.deleteThumbnail(event, '${filenameEscaped}')">❌</button>
+                               onclick="event.stopPropagation(); gallery.saveCheckboxState(event);" title="Выбрать">
+                        <button class="delete-btn" onclick="gallery.deleteThumbnail(event, '${filenameEscaped}')" title="Удалить">✕</button>
                     </div>
                     <div class="image-rating" style="opacity: 0;">
                         ${Array.from({ length: MAX_RATING }, (_, i) => i + 1).map(star => `
@@ -312,6 +397,7 @@ const gallery = {
                             </span>`).join("")}
                     </div>
                     <img src="/serve_thumbnail/${img.thumbnail}" alt="Image" loading="lazy"
+                         onload="this.parentElement.classList.add('image-loaded')"
                          onmouseenter="tooltip.show(event, '${prompt}', '${seed}', ${tagsJson})"
                          onmousemove="tooltip.updatePosition(event)"
                          onmouseleave="tooltip.hide()">
@@ -321,6 +407,8 @@ const gallery = {
 
     filter() {
         state.searchQuery = DOM.searchBox.value.trim();
+        // Синхронизируем сортировку перед фильтрацией
+        state.sortBy = DOM.sortSelect.value;
         gallery.load();
     },
 
@@ -406,6 +494,102 @@ const gallery = {
         document.querySelectorAll("#gallery .image-container").forEach((container, i) => {
             container.setAttribute("onclick", `fullscreen.open(${i})`);
         });
+    },
+
+    async checkForUpdates() {
+        // Не обновляем, если идет загрузка, открыт полноэкранный режим или пользователь не на главной странице
+        if (state.loading || DOM.fullscreenContainer.style.display === "flex") {
+            return;
+        }
+
+        try {
+            // Синхронизируем сортировку из DOM в state перед проверкой (только если изменилась)
+            const currentSortBy = DOM.sortSelect.value;
+            if (currentSortBy !== state.sortBy) {
+                state.sortBy = currentSortBy;
+            }
+            const [sort, order] = state.sortBy.split("-");
+
+            // Автообновление работает только для сортировки по убыванию даты
+            if (sort !== "date" || order !== "desc") {
+                return;
+            }
+
+            // Запрашиваем только первые изображения для поиска новых (не все!)
+            const query = `/images${window.location.pathname}?limit=${LIMIT}&offset=0&search=${encodeURIComponent(state.searchQuery)}&sort_by=${sort}&order=${order}`;
+            const serverImages = await (await fetch(query)).json();
+
+            // Нормализуем метаданные
+            serverImages.forEach(img => {
+                if (!img.metadata) {
+                    img.metadata = {};
+                }
+                if (img.metadata.rating === undefined || img.metadata.rating === null) {
+                    img.metadata.rating = 0;
+                }
+            });
+
+            // Создаем Map для быстрого поиска
+            const serverImageMap = new Map(serverImages.map(img => [img.filename, img]));
+            const currentImageMap = new Map(state.currentImages.map(img => [img.filename, img]));
+
+            // Находим новые изображения
+            const newImages = serverImages.filter(img => !currentImageMap.has(img.filename));
+
+            // Находим удаленные изображения
+            const removedFilenames = state.currentImages
+                .filter(img => !serverImageMap.has(img.filename))
+                .map(img => img.filename);
+
+            // Удаляем старые изображения из DOM
+            removedFilenames.forEach(filename => {
+                const container = document.querySelector(`.image-container [data-filename="${filename.replace(/"/g, "&quot;").replace(/'/g, "&#39;")}"]`)?.closest(".image-container");
+                if (container) {
+                    container.remove();
+                }
+            });
+
+            // Удаляем из state
+            state.currentImages = state.currentImages.filter(img => !removedFilenames.includes(img.filename));
+
+            // Добавляем новые изображения в начало (для сортировки по убыванию даты новые изображения самые свежие)
+            if (newImages.length > 0) {
+                // Вставляем новые изображения в начало списка
+                const cardsHTML = gallery.renderCards(newImages);
+                DOM.gallery.insertAdjacentHTML("afterbegin", cardsHTML);
+
+                // Обновляем state - добавляем в начало
+                state.currentImages.unshift(...newImages);
+
+                // Обновляем чекбоксы и рейтинги
+                gallery.loadCheckboxState();
+                newImages.forEach(img => rating.updateStars(null, img.filename, img.metadata.rating || 0));
+                gallery.rebindIndices();
+            }
+
+            state.lastUpdateTime = Date.now();
+        } catch (error) {
+            console.error("Failed to check for updates:", error);
+        }
+    },
+
+    startAutoRefresh() {
+        // Останавливаем предыдущий интервал, если есть
+        if (state.autoRefreshInterval) {
+            clearInterval(state.autoRefreshInterval);
+        }
+
+        // Запускаем автообновление
+        state.autoRefreshInterval = setInterval(() => {
+            gallery.checkForUpdates();
+        }, AUTO_REFRESH_INTERVAL);
+    },
+
+    stopAutoRefresh() {
+        if (state.autoRefreshInterval) {
+            clearInterval(state.autoRefreshInterval);
+            state.autoRefreshInterval = null;
+        }
     }
 };
 
@@ -494,10 +678,14 @@ const fullscreen = {
         state.currentIndex = index;
         fullscreen.updateView();
         DOM.fullscreenContainer.style.display = "flex";
+        // Останавливаем автообновление при открытии полноэкранного режима
+        gallery.stopAutoRefresh();
     },
 
     close() {
         DOM.fullscreenContainer.style.display = "none";
+        // Возобновляем автообновление при закрытии полноэкранного режима
+        gallery.startAutoRefresh();
     },
 
     updateView() {
@@ -518,7 +706,6 @@ const fullscreen = {
         const wrapper = document.querySelector(".fullscreen-image-wrapper");
         wrapper?.classList.toggle("checked", isChecked);
 
-        DOM.fullscreenTags.value = (data.metadata.tags || []).join(", ");
         DOM.fullscreenTagsDisplay.innerHTML = "";
         tags.renderPills(data.metadata.tags || []);
 
@@ -527,7 +714,7 @@ const fullscreen = {
     },
 
     setupCheckboxHandler(data, miniCheckbox, wrapper) {
-        DOM.fullscreenCheckbox.onchange = function() {
+        DOM.fullscreenCheckbox.onchange = function () {
             const checked = DOM.fullscreenCheckbox.checked;
             data.metadata.checked = checked;
             wrapper?.classList.toggle("checked", checked);
@@ -557,33 +744,37 @@ const fullscreen = {
             star.textContent = starRating <= currentRating ? STARRED_SYMBOL : UNSTARRED_SYMBOL;
             star.classList.toggle("selected", starRating <= currentRating);
 
-            star.onclick = function(e) {
+            star.onclick = function (e) {
                 e.stopPropagation();
-                
+
+                const currentRating = data.metadata.rating || 0;
+                // Если кликнули на уже выбранную звездочку - сбрасываем рейтинг
+                const newRating = currentRating === starRating ? 0 : starRating;
+
                 // Обновляем метаданные в состоянии
-                data.metadata.rating = starRating;
-                
+                data.metadata.rating = newRating;
+
                 // Обновляем метаданные в массиве currentImages
                 const img = state.currentImages.find(i => i.filename === data.filename);
                 if (img) {
-                    img.metadata.rating = starRating;
+                    img.metadata.rating = newRating;
                 }
 
                 // Обновляем визуальное отображение в fullscreen
                 stars.forEach(s => {
                     const r = parseInt(s.dataset.rating);
-                    s.textContent = r <= starRating ? STARRED_SYMBOL : UNSTARRED_SYMBOL;
-                    s.classList.toggle("selected", r <= starRating);
+                    s.textContent = r <= newRating ? STARRED_SYMBOL : UNSTARRED_SYMBOL;
+                    s.classList.toggle("selected", r <= newRating);
                 });
 
                 // Обновляем визуальное отображение в галерее
-                rating.updateStars(null, data.filename, starRating);
+                rating.updateStars(null, data.filename, newRating);
 
                 // Сохраняем на сервере
                 utils.apiRequest("/update_metadata", {
-                    body: JSON.stringify({ filename: data.filename, rating: starRating })
+                    body: JSON.stringify({ filename: data.filename, rating: newRating })
                 }).then(() => {
-                    console.log("✅ Рейтинг сохранен:", starRating);
+                    console.log("✅ Рейтинг сохранен:", newRating);
                 }).catch(error => {
                     console.error("❌ Ошибка сохранения рейтинга:", error);
                 });
@@ -655,16 +846,20 @@ const rating = {
     set(event, filename, ratingValue) {
         event.stopPropagation();
         const img = state.currentImages.find(i => i.filename === filename);
-        if (img) {
-            img.metadata.rating = ratingValue;
-        }
+        if (!img) return;
 
-        rating.updateStars(null, filename, ratingValue);
+        const currentRating = img.metadata.rating || 0;
+        // Если кликнули на уже выбранную звездочку - сбрасываем рейтинг
+        const newRating = currentRating === ratingValue ? 0 : ratingValue;
+
+        img.metadata.rating = newRating;
+
+        rating.updateStars(null, filename, newRating);
 
         utils.apiRequest("/update_metadata", {
-            body: JSON.stringify({ filename, rating: ratingValue })
+            body: JSON.stringify({ filename, rating: newRating })
         }).then(() => {
-            console.log("✅ Рейтинг сохранен:", ratingValue, "для", filename);
+            console.log("✅ Рейтинг сохранен:", newRating, "для", filename);
         }).catch(error => {
             console.error("❌ Ошибка сохранения рейтинга:", error);
         });
@@ -714,153 +909,6 @@ const tags = {
             };
             DOM.fullscreenTagsDisplay.appendChild(span);
         });
-    },
-
-    async save() {
-        const tagList = DOM.fullscreenTags.value.split(",").map(t => t.trim()).filter(Boolean);
-        const data = state.currentImages[state.currentIndex];
-        if (!data) return;
-
-        data.metadata.tags = tagList;
-
-        const container = document.querySelector(`.image-container [data-filename="${data.filename}"]`)?.closest(".image-container");
-        if (container) {
-            const imgEl = container.querySelector("img");
-            if (imgEl) {
-                const prompt = utils.escapeJS(data.metadata.prompt);
-                const seed = utils.escapeJS(utils.extractSeed(data.filename));
-                const tagsJson = utils.sanitizeTagsJSON(tagList);
-                imgEl.setAttribute("onmouseenter", `tooltip.show(event, '${prompt}', '${seed}', ${tagsJson})`);
-            }
-        }
-
-        tagList.forEach(tag => {
-            if (!state.allTags.includes(tag)) {
-                state.allTags.push(tag);
-            }
-        });
-
-        try {
-            await utils.apiRequest("/update_metadata", {
-                body: JSON.stringify({ filename: data.filename, tags: tagList })
-            });
-            console.log("✅ Теги обновлены:", tagList);
-        } catch (error) {
-            console.error("Failed to save tags:", error);
-        }
-
-        tags.renderPills(tagList);
-        tags.showSavedIndicator();
-        DOM.fullscreenTags.focus();
-    },
-
-    showSavedIndicator() {
-        if (!DOM.tagsSavedIndicator) return;
-
-        DOM.tagsSavedIndicator.classList.remove("hidden");
-        DOM.tagsSavedIndicator.classList.add("visible");
-
-        setTimeout(() => {
-            DOM.tagsSavedIndicator.classList.remove("visible");
-            DOM.tagsSavedIndicator.classList.add("hidden");
-        }, TAG_SAVED_INDICATOR_DELAY);
-    },
-
-    closeSuggestions() {
-        document.querySelector(".tag-suggestion-container")?.remove();
-    },
-
-    handleInput() {
-        const value = DOM.fullscreenTags.value.split(",").pop().trim().toLowerCase();
-        tags.closeSuggestions();
-
-        if (!value) return;
-
-        const suggestions = state.allTags
-            .filter(tag => tag.toLowerCase().startsWith(value))
-            .slice(0, MAX_TAG_SUGGESTIONS);
-
-        if (!suggestions.length) return;
-
-        const container = document.createElement("div");
-        container.className = "tag-suggestion-container";
-
-        suggestions.forEach(tag => {
-            const div = document.createElement("div");
-            div.className = "tag-suggestion";
-            div.innerHTML = `<strong>${tag.slice(0, value.length)}</strong>${tag.slice(value.length)}`;
-            div.onclick = () => {
-                const parts = DOM.fullscreenTags.value.split(",");
-                parts[parts.length - 1] = tag;
-                DOM.fullscreenTags.value = parts.join(", ") + ", ";
-                tags.closeSuggestions();
-                DOM.fullscreenTags.focus();
-            };
-            container.appendChild(div);
-        });
-
-        state.suggestionIndex = -1;
-        DOM.fullscreenTags.parentNode.appendChild(container);
-    },
-
-    handleKeydown(e) {
-        const container = document.querySelector(".tag-suggestion-container");
-        const items = container ? container.querySelectorAll(".tag-suggestion") : [];
-
-        // Обработка Enter должна работать всегда
-        if (e.key === "Enter") {
-            if (container && items.length && state.suggestionIndex >= 0 && state.suggestionIndex < items.length) {
-                // Если есть выбранное предложение - выбрать его
-                e.preventDefault();
-                items[state.suggestionIndex].click();
-            } else {
-                // Если нет предложений или ничего не выбрано - сохранить теги
-                e.preventDefault();
-                tags.save();
-            }
-            return;
-        }
-
-        // Escape и Backspace+Ctrl работают без контейнера
-        if (e.key === "Escape") {
-            if (container) {
-                tags.closeSuggestions();
-            }
-            return;
-        }
-
-        if (e.key === "Backspace" && e.ctrlKey) {
-            e.preventDefault();
-            const pos = DOM.fullscreenTags.selectionStart;
-            const before = DOM.fullscreenTags.value.slice(0, pos);
-            const after = DOM.fullscreenTags.value.slice(DOM.fullscreenTags.selectionEnd);
-            const lastComma = before.lastIndexOf(",");
-
-            const newBefore = lastComma >= 0
-                ? before.slice(0, lastComma).replace(/\s+$/, "")
-                : "";
-
-            DOM.fullscreenTags.value = newBefore + after;
-            const newPos = newBefore.length;
-            DOM.fullscreenTags.setSelectionRange(newPos, newPos);
-            return;
-        }
-
-        // Остальные клавиши работают только если есть контейнер с предложениями
-        if (!container || !items.length) return;
-
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            state.suggestionIndex = (state.suggestionIndex + 1) % items.length;
-        } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            state.suggestionIndex = (state.suggestionIndex - 1 + items.length) % items.length;
-        }
-
-        // Подсветка активного предложения
-        items.forEach((el, i) => {
-            el.classList.toggle("active", i === state.suggestionIndex);
-        });
     }
 };
 
@@ -901,7 +949,7 @@ const favorites = {
     copyFromFullscreen() {
         const data = state.currentImages[state.currentIndex];
         if (!data) return;
-        favorites.copy({ stopPropagation: () => {} }, data.filename);
+        favorites.copy({ stopPropagation: () => { } }, data.filename);
     }
 };
 
@@ -911,7 +959,12 @@ const favorites = {
 
 const ui = {
     changeSort() {
-        state.sortBy = DOM.sortSelect.value;
+        const newSortBy = DOM.sortSelect.value;
+        // Останавливаем автообновление перед сменой сортировки
+        gallery.stopAutoRefresh();
+        state.sortBy = newSortBy;
+        // Сохраняем в localStorage
+        stateManager.save();
         gallery.load();
     },
 
@@ -938,35 +991,28 @@ const ui = {
 const keyboard = {
     handleKeydown(e) {
         const isFullscreen = DOM.fullscreenContainer.style.display === "flex";
-        const isTagInputFocused = document.activeElement === DOM.fullscreenTags;
 
         if (isFullscreen) {
-            keyboard.handleFullscreenKeys(e, isTagInputFocused);
+            keyboard.handleFullscreenKeys(e);
         }
 
-        keyboard.handleCopyShortcut(e, isFullscreen, isTagInputFocused);
+        keyboard.handleCopyShortcut(e, isFullscreen);
     },
 
-    handleFullscreenKeys(e, isTagInputFocused) {
-        if (!isTagInputFocused) {
-            if (e.key === "ArrowLeft") fullscreen.prev();
-            if (e.key === "ArrowRight") fullscreen.next();
-            if (e.key === "Delete") fullscreen.delete();
-            if (e.key === "Escape") fullscreen.close();
-        } else if (e.key === "Escape") {
-            // Если фокус на input тегов, Escape просто убирает фокус
-            DOM.fullscreenTags.blur();
-        }
-        // Остальные клавиши для input тегов обрабатываются в tags.handleKeydown
+    handleFullscreenKeys(e) {
+        if (e.key === "ArrowLeft") fullscreen.prev();
+        if (e.key === "ArrowRight") fullscreen.next();
+        if (e.key === "Delete") fullscreen.delete();
+        if (e.key === "Escape") fullscreen.close();
     },
 
-    handleCopyShortcut(e, isFullscreen, isTagInputFocused) {
+    handleCopyShortcut(e, isFullscreen) {
         if (!e.ctrlKey || (e.key.toLowerCase() !== "c" && e.key.toLowerCase() !== "с")) return;
 
         const selection = window.getSelection();
         const isTextSelected = selection && selection.toString().length > 0;
 
-        if (isTagInputFocused && isTextSelected) return;
+        if (isTextSelected) return;
 
         if (isFullscreen) {
             fullscreen.copyPrompt();
@@ -1010,9 +1056,8 @@ window.hideStars = rating.hideStars;
 window.showTooltip = tooltip.show;
 window.updateTooltipPosition = tooltip.updatePosition;
 window.hideTooltip = tooltip.hide;
-window.saveTags = tags.save;
 
-window.onload = function() {
+window.onload = function () {
     const saved = localStorage.getItem("galleryState");
     if (saved) {
         try {
@@ -1022,7 +1067,7 @@ window.onload = function() {
             }
             if (typeof state.sidebarVisible === "boolean") {
                 DOM.sidebar.classList.toggle("hidden", !state.sidebarVisible);
-                document.querySelector(".container")?.classList.toggle("sidebar-visible", state.sidebarVisible);
+                document.body.classList.toggle("sidebar-visible", state.sidebarVisible);
             }
         } catch (e) {
             console.warn("Ошибка восстановления пути:", e);
@@ -1067,21 +1112,15 @@ window.onload = function() {
 
     DOM.fullscreenContainer.addEventListener("click", e => {
         const isOutside = !e.target.closest(".fullscreen-image-wrapper")
-            && !e.target.closest(".nav-arrow")
-            && !e.target.closest(".tag-suggestion-container");
+            && !e.target.closest(".nav-arrow");
         if (isOutside) fullscreen.close();
     });
-
-    DOM.fullscreenTags.addEventListener("input", tags.handleInput);
-    DOM.fullscreenTags.addEventListener("blur", () => {
-        setTimeout(tags.closeSuggestions, TAG_SUGGESTION_BLUR_DELAY);
-    });
-    DOM.fullscreenTags.addEventListener("keydown", tags.handleKeydown);
 
     ui.updateToggleButtonPosition();
 };
 
 window.onpopstate = () => {
+    gallery.stopAutoRefresh();
     contentLoader.load();
     gallery.loadCheckboxState();
     DOM.scrollToTop.classList.add("hidden");

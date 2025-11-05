@@ -89,10 +89,10 @@
     <div class="fullscreen-img" id="fullscreen-container">
         <div class="fullscreen-image-wrapper">
             <div class="image-buttons fullscreen-buttons">
-                <button class="copy-btn" onclick="copyPromptFullscreen()">📋</button>
-                <button class="copy-favorites-btn" onclick="copyToFavoritesFullscreen()">⭐</button>
-                <input type="checkbox" id="fullscreen-checkbox" class="image-checkbox">
-                <button class="delete-btn" onclick="deleteFullscreen()">❌</button>
+                <button class="copy-btn" onclick="copyPromptFullscreen()" title="Копировать промпт">⧉</button>
+                <button class="copy-favorites-btn" onclick="copyToFavoritesFullscreen()" title="В избранное">★</button>
+                <input type="checkbox" id="fullscreen-checkbox" class="image-checkbox" title="Выбрать">
+                <button class="delete-btn" onclick="deleteFullscreen()" title="Удалить">✕</button>
             </div>
             <div class="fullscreen-rating" id="fullscreen-rating">
                 <span class="star" data-rating="1">☆</span>
@@ -104,10 +104,6 @@
             <img id="fullscreen-img" src="" alt="Fullscreen Image">
             <div id="fullscreen-prompt" data-prompt=""></div>
             <div class="fullscreen-tags-overlay">
-                <div id="fullscreen-tags-wrapper">
-                    <input id="fullscreen-tags" autocomplete="off" placeholder="теги, через запятую... (Enter)">
-                </div>
-                <div id="tags-saved-indicator" class="tags-saved-indicator hidden">✅ Сохранено</div>
                 <div id="fullscreen-tags-display" class="tag-pill-container"></div>
             </div>
         </div>
@@ -117,8 +113,7 @@
 
     <!-- JavaScript Constants -->
     <script>
-        const IMAGES_PER_ROW = {{ images_per_row }};
-        const FOLDER_TREE = {{ folder_tree|tojson }};
+        // Constants removed - using CSS Columns layout instead of grid
     </script>
     <script src="/static/script.js"></script>
 </body>

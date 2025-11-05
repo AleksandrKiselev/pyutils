@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "🐍 Flask: Запустить приложение",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/browser/app.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/browser",
+            "env": {
+                "FLASK_ENV": "development",
+                "FLASK_DEBUG": "true"
+            },
+            "python": "${command:python.interpreterPath}",
+            "subProcess": true
+        }
+    ]
+}
+
