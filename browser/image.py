@@ -6,10 +6,9 @@ import time
 import logging
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
-from rapidfuzz import fuzz
 from metadata import load_metadata
 from PIL import Image, UnidentifiedImageError
-from file_utils import get_thumbnail_path, get_absolute_path, get_relative_path, walk_images
+from paths import get_thumbnail_path, get_absolute_path, get_relative_path, walk_images
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -46,7 +45,12 @@ def collect_images(folder=None):
     image_paths = []
     if folder:
         paths = os.listdir(folder)
-        image_paths = [os.path.join(folder, f) for f in paths if f.lower().endswith(".png")]
+        image_paths = [
+            os.path.join(folder, f) 
+            for f in paths 
+            if os.path.isfile(os.path.join(folder, f)) and 
+               os.path.splitext(f)[1].lower() in config.ALLOWED_EXTENSIONS
+        ]
     else:
         image_paths = list(walk_images())
     results = []

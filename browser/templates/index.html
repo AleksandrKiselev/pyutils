@@ -6,68 +6,77 @@
     <title>Image Viewer</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body class="sidebar-visible">
+<body>
     <!-- Sidebar -->
     <aside id="sidebar" class="sidebar">
-        <!-- Search and Sort -->
-        <div class="search-sort-bar">
-            <div class="search-sort-center">
-                <div class="search-container">
-                    <input type="text" id="search-box" placeholder="prompt или t:tag1,tag2,..." oninput="filterImages()">
-                </div>
-                <div class="sort-container">
-                    <select id="sort-select" onchange="changeSort()">
-                        <option value="date-asc">Дата ↑</option>
-                        <option value="date-desc">Дата ↓</option>
-                        <option value="filename-asc">Имя ↑</option>
-                        <option value="filename-desc">Имя ↓</option>
-                        <option value="prompt-asc">Промпт ↑</option>
-                        <option value="prompt-desc">Промпт ↓</option>
-                        <option value="rating-asc">Рейтинг ↑</option>
-                        <option value="rating-desc">Рейтинг ↓</option>
-                        <option value="tags-asc">Теги ↑</option>
-                        <option value="tags-desc">Теги ↓</option>
-                    </select>
-                </div>
-                <div class="reset-and-folder">
-                    <button onclick="uncheckAllCheckboxes()" class="reset-checkboxes-btn">Reset✅</button>
+        <!-- Sidebar Header with Toggle Button -->
+        <div class="sidebar-header">
+            <button id="menu-toggle" class="sidebar-toggle" title="Закрыть панель">
+                <span id="menu-icon">⯇</span>
+            </button>
+        </div>
+        <!-- Sidebar Content -->
+        <div class="sidebar-content">
+            <!-- Search and Sort -->
+            <div class="search-sort-bar">
+                <div class="search-sort-center">
+                    <div class="search-container">
+                        <input type="text" id="search-box" placeholder="prompt | t:tag1,… | g: | g:t:" oninput="filterImages()">
+                    </div>
+                    <div class="sort-container">
+                        <select id="sort-select" onchange="changeSort()">
+                            <option value="date-asc">📅 Старые → Новые</option>
+                            <option value="date-desc" selected>📅 Новые → Старые</option>
+                            <option value="filename-asc">📝 А → Я</option>
+                            <option value="filename-desc">📝 Я → А</option>
+                            <option value="prompt-asc">💬 Промпт А → Я</option>
+                            <option value="prompt-desc">💬 Промпт Я → А</option>
+                            <option value="rating-asc">⭐ Рейтинг 1 → 5</option>
+                            <option value="rating-desc">⭐ Рейтинг 5 → 1</option>
+                            <option value="tags-asc">🏷️ Теги А → Я</option>
+                            <option value="tags-desc">🏷️ Теги Я → А</option>
+                        </select>
+                    </div>
+                    <div class="reset-and-folder">
+                        <button onclick="uncheckAllCheckboxes()" class="reset-checkboxes-btn">Reset✅</button>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="sidebar-folders">
-            {% macro render_tree(tree) %}
-            <ul class="folder-tree">
-                {% for path, node in tree.items() %}
-                    <li class="folder-item{% if node.children %} has-children expanded{% endif %}">
-                        <div class="folder-row" data-has-children="{{ node.children is defined and node.children }}">
-                            {% if node.children %}
-                                <span class="folder-toggle" onclick="toggleFolder(event)">⯈</span>
-                            {% else %}
-                                <span class="folder-toggle-placeholder"></span>
-                            {% endif %}
-                            <a href="/{{ path }}" onclick="updateUrl(event, '{{ path }}')">
-                                {{ node.name }} ({{ node.count }})
-                            </a>
-                        </div>
-                        {% if node.children %}
-                            <div class="folder-children">
-                                {{ render_tree(node.children) }}
+            <div class="sidebar-folders">
+                {% macro render_tree(tree) %}
+                <ul class="folder-tree">
+                    {% for path, node in tree.items() %}
+                        <li class="folder-item{% if node.children %} has-children expanded{% endif %}">
+                            <div class="folder-row" data-has-children="{{ node.children is defined and node.children }}">
+                                {% if node.children %}
+                                    <span class="folder-toggle" onclick="toggleFolder(event)">⯈</span>
+                                {% else %}
+                                    <span class="folder-toggle-placeholder"></span>
+                                {% endif %}
+                                <a href="/{{ path }}" onclick="updateUrl(event, '{{ path }}')">
+                                    {{ node.name }} ({{ node.count }})
+                                </a>
                             </div>
-                        {% endif %}
-                    </li>
-                {% endfor %}
-            </ul>
-            {% endmacro %}
-            {{ render_tree(folder_tree) }}
+                            {% if node.children %}
+                                <div class="folder-children">
+                                    {{ render_tree(node.children) }}
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+                {% endmacro %}
+                {{ render_tree(folder_tree) }}
+            </div>
+            <div class="sidebar-folders-bottom-spacer"></div>
         </div>
-        <div class="sidebar-folders-bottom-spacer"></div>
     </aside>
 
     <!-- Основной контент -->
     <div class="container">
-        <!-- Sidebar toggle -->
-        <button id="menu-toggle" class="menu-toggle">
-            <span id="menu-icon">⯇</span>
+        <!-- Sidebar Toggle Button (floating, when sidebar is closed) -->
+        <button id="menu-toggle-floating" class="menu-toggle-floating" title="Открыть панель">
+            <span id="menu-icon-floating">⯈</span>
         </button>
 
         <!-- Scroll to top button -->
@@ -75,11 +84,11 @@
             <button id="scroll-to-top" onclick="scrollToTop()">▲</button>
         </div>
 
-        <!-- Tooltip -->
-        <div id="tooltip" class="image-tooltip"></div>
-
         <!-- Loading indicator -->
         <div id="loading">Loading...</div>
+
+        <!-- Toast notification -->
+        <div id="toast" class="toast"></div>
 
         <!-- Gallery -->
         <main id="gallery" class="gallery"></main>
@@ -111,10 +120,6 @@
         <button class="nav-arrow nav-right" onclick="nextImage()">▶</button>
     </div>
 
-    <!-- JavaScript Constants -->
-    <script>
-        // Constants removed - using CSS Columns layout instead of grid
-    </script>
     <script src="/static/script.js"></script>
 </body>
 </html>
