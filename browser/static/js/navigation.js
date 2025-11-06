@@ -3,10 +3,22 @@ const navigation = {
         event.preventDefault();
         if (window.location.pathname === `/${path}`) return;
 
+        // Блокируем переключение папок, если идет генерация метаданных
+        if (progressBar.taskId) {
+            event.stopPropagation();
+            toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
+            return;
+        }
+
+        // Закрываем полноэкранный режим при переключении папки
+        if (DOM.fullscreenContainer.style.display === "flex") {
+            fullscreen.close();
+        }
+
         state.loading = false;
         stateManager.save();
-        window.history.pushState({}, '', `/${path}`);
-        await contentLoader.load();
+        window.history.pushState({ path: `/${path}` }, '', `/${path}`);
+        await navigation.loadContent();
         folders.updateActiveHighlight();
     },
 
@@ -22,12 +34,6 @@ const navigation = {
             DOM.loading.style.display = "none";
         }
         tags.fetchAll();
-    }
-};
-
-const contentLoader = {
-    async load() {
-        await navigation.loadContent();
     }
 };
 

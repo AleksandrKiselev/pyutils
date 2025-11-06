@@ -10,7 +10,7 @@ import logging
 from functools import lru_cache
 from typing import Dict, Any
 from paths import get_metadata_path
-from tag import auto_add_tags_from_prompt
+from tag import add_tags_from_prompt
 from exceptions import FileOperationError
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
         modified = True
     if "tags" not in metadata:
         try:
-            auto_add_tags_from_prompt(image_path, metadata)
+            add_tags_from_prompt(image_path, metadata)
         except Exception as e:
             logger.error(f"Ошибка автоматического добавления тегов для {image_path}: {e}")
             metadata["tags"] = []

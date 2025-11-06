@@ -46,7 +46,7 @@ def extract_seed(image_path: str) -> str:
 
 
 def auto_add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], threshold: float = 0.90) -> None:
-    tag_list = config.AUTO_TAGS
+    tag_list = config.TAGS
     prompt_lower = metadata.get("prompt", "").lower()
 
     if not prompt_lower:
@@ -88,8 +88,6 @@ def auto_add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], thresho
                         return tag
         return None
 
-    # Убрано создание ThreadPoolExecutor для каждого изображения
-    # Для небольшого количества тегов (обычно <100) последовательная обработка быстрее
     prompt_tags = set()
     for tag_tuple in normalized_tags:
         result = check_tag(tag_tuple)

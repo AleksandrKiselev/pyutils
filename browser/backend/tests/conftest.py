@@ -55,7 +55,7 @@ def sample_config(temp_image_folder):
     config.ALLOWED_EXTENSIONS = set(config["allowed_extensions"])
     config.THUMBNAIL_SIZE = int(config["thumbnail_size"])
     config.ITEMS_PER_PAGE = int(config["items_per_page"])
-    config.AUTO_TAGS = set(config.get("auto_tags", []))
+    config.TAGS = set(config.get("auto_tags", []))
     return config
 
 
@@ -79,7 +79,7 @@ def mock_config(temp_image_folder):
     mock_config_obj.THUMBNAIL_SIZE = 256
     mock_config_obj.ITEMS_PER_PAGE = 20
     mock_config_obj.ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
-    mock_config_obj.AUTO_TAGS = {"test", "tag1", "tag2"}
+    mock_config_obj.TAGS = {"test", "tag1", "tag2"}
     
     # Патчим только те модули, которые действительно импортируют config
     patches = [

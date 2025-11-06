@@ -26,6 +26,11 @@ const folders = {
                 row.addEventListener("click", folders.toggle);
             }
         });
+        
+        // Восстанавливаем блокировку навигации, если идет генерация
+        if (progressBar.taskId) {
+            progressBar.blockNavigation();
+        }
     },
 
     updateActiveHighlight() {
@@ -97,6 +102,13 @@ const folders = {
 
     toggle(event) {
         event.stopPropagation();
+        
+        // Блокируем разворачивание папок во время генерации метаданных
+        if (progressBar.taskId) {
+            toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
+            return;
+        }
+        
         const item = event.currentTarget.closest(".folder-item");
         const children = item.querySelector(".folder-children");
         if (!children) return;

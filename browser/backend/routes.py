@@ -188,28 +188,26 @@ def get_all_tags():
         return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 
+def _get_validated_path_and_search(data):
+    """Валидирует путь и поисковый запрос из данных запроса."""
+    subpath = data.get("path", "")
+    raw_search = data.get("search", "")
+    
+    if subpath:
+        subpath = unquote(subpath)
+    
+    folder_path = _get_validated_folder_path(subpath)
+    scope, search = validate_search_query(raw_search)
+    search_folder_path = None if scope == "global" else folder_path
+    
+    return search_folder_path, search
+
+
 @routes.route("/uncheck_all", methods=["POST"])
 def uncheck_all():
     try:
         data = validate_json_request(request)
-        subpath = data.get("path", "")
-        raw_search = data.get("search", "")
-        
-        if subpath:
-            subpath = unquote(subpath)
-        
-        try:
-            folder_path = get_absolute_path(subpath)
-            folder_path = os.path.normpath(folder_path)
-            
-            if not os.path.isdir(folder_path):
-                raise PathNotFoundError(f"Путь не существует: {folder_path}")
-        except Exception as e:
-            logger.exception(f"Ошибка обработки пути: {e}")
-            raise InvalidRequestError(f"Ошибка обработки пути: {str(e)}")
-        
-        scope, search = validate_search_query(raw_search)
-        search_folder_path = None if scope == "global" else folder_path
+        search_folder_path, search = _get_validated_path_and_search(data)
         
         count = MetadataService.uncheck_all(search_folder_path, search)
         return jsonify({"success": True, "count": count})
@@ -224,27 +222,9 @@ def uncheck_all():
 def delete_metadata():
     try:
         data = validate_json_request(request)
-        subpath = data.get("path", "")
-        raw_search = data.get("search", "")
-        
-        if subpath:
-            subpath = unquote(subpath)
-        
-        try:
-            folder_path = get_absolute_path(subpath)
-            folder_path = os.path.normpath(folder_path)
-            
-            if not os.path.isdir(folder_path):
-                raise PathNotFoundError(f"Путь не существует: {folder_path}")
-        except Exception as e:
-            logger.exception(f"Ошибка обработки пути: {e}")
-            raise InvalidRequestError(f"Ошибка обработки пути: {str(e)}")
-        
-        scope, search = validate_search_query(raw_search)
-        search_folder_path = None if scope == "global" else folder_path
+        search_folder_path, search = _get_validated_path_and_search(data)
         
         count = MetadataService.delete_metadata(search_folder_path, search)
-        
         return jsonify({"success": True, "count": count})
     except (PathNotFoundError, InvalidRequestError):
         raise

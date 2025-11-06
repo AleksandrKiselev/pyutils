@@ -1,5 +1,5 @@
 window.updateUrl = navigation.updateUrl;
-window.loadContent = contentLoader.load;
+window.loadContent = navigation.loadContent;
 window.filterImages = gallery.filter;
 window.changeSort = ui.changeSort;
 window.toggleFolder = folders.toggle;
@@ -24,21 +24,23 @@ window.startProgress = progressBar.start.bind(progressBar);
 window.onload = function () {
     document.body.classList.add("no-transition");
     
+    // Восстанавливаем состояние из localStorage
     const saved = localStorage.getItem("galleryState");
     if (saved) {
         try {
-            const state = JSON.parse(saved);
-            if (state.currentPath && state.currentPath !== "/") {
-                window.history.replaceState({}, "", state.currentPath);
-            }
-            if (typeof state.sidebarVisible === "boolean") {
-                DOM.sidebar.classList.toggle("hidden", !state.sidebarVisible);
-                document.body.classList.toggle("sidebar-visible", state.sidebarVisible);
+            const savedState = JSON.parse(saved);
+            if (savedState.currentPath && savedState.currentPath !== "/") {
+                window.history.replaceState({ path: savedState.currentPath }, "", savedState.currentPath);
+            } else {
+                window.history.replaceState({ path: window.location.pathname }, "", window.location.pathname);
             }
         } catch (e) {
             console.warn("Ошибка восстановления пути:", e);
         }
     }
+    
+    // Восстанавливаем остальное состояние через stateManager
+    stateManager.restore();
     
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -46,7 +48,7 @@ window.onload = function () {
         });
     });
 
-    contentLoader.load();
+    navigation.loadContent();
     DOM.scrollToTop.classList.add("hidden");
 
     DOM.menuToggle.addEventListener("click", ui.closeSidebar);
@@ -85,8 +87,22 @@ window.onload = function () {
     });
 };
 
-window.onpopstate = () => {
-    contentLoader.load();
+window.onpopstate = (event) => {
+    // Блокируем переключение папок, если идет генерация метаданных
+    if (progressBar.taskId) {
+        // Возвращаемся обратно к предыдущему состоянию
+        const previousPath = event.state?.path || window.location.pathname;
+        window.history.pushState({ path: previousPath }, '', previousPath);
+        toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
+        return;
+    }
+
+    // Закрываем полноэкранный режим при переключении папки (назад/вперед)
+    if (DOM.fullscreenContainer.style.display === "flex") {
+        fullscreen.close();
+    }
+    
+    navigation.loadContent();
     gallery.loadCheckboxState();
     DOM.scrollToTop.classList.add("hidden");
 };

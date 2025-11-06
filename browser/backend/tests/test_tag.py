@@ -9,7 +9,7 @@ from tag import (
     normalize_text,
     get_image_tags,
     extract_seed,
-    auto_add_tags_from_prompt,
+    add_tags_from_prompt,
     get_all_tags_cached
 )
 from config import config
@@ -109,13 +109,13 @@ class TestExtractSeed:
 
 
 class TestAutoAddTagsFromPrompt:
-    """Тесты для auto_add_tags_from_prompt."""
+    """Тесты для add_tags_from_prompt."""
     
     def test_auto_add_tags_no_prompt(self, temp_image_folder, sample_image_path, monkeypatch):
         """Тест добавления тегов без промпта."""
-        monkeypatch.setattr("config.config", MagicMock(AUTO_TAGS={"test", "tag1"}))
+        monkeypatch.setattr("config.config", MagicMock(TAGS={"test", "tag1"}))
         metadata = {}
-        auto_add_tags_from_prompt(sample_image_path, metadata)
+        add_tags_from_prompt(sample_image_path, metadata)
         
         assert "tags" in metadata
         assert len(metadata["tags"]) > 0
@@ -123,9 +123,9 @@ class TestAutoAddTagsFromPrompt:
     
     def test_auto_add_tags_with_matching_prompt(self, temp_image_folder, sample_image_path, monkeypatch):
         """Тест добавления тегов с совпадающим промптом."""
-        monkeypatch.setattr("config.config", MagicMock(AUTO_TAGS={"solo", "test"}))
+        monkeypatch.setattr("config.config", MagicMock(TAGS={"solo", "test"}))
         metadata = {"prompt": "A beautiful solo character"}
-        auto_add_tags_from_prompt(sample_image_path, metadata)
+        add_tags_from_prompt(sample_image_path, metadata)
         
         assert "tags" in metadata
         tags = metadata["tags"]
@@ -134,17 +134,17 @@ class TestAutoAddTagsFromPrompt:
     
     def test_auto_add_tags_preserves_existing(self, temp_image_folder, sample_image_path, monkeypatch):
         """Тест сохранения существующих тегов."""
-        monkeypatch.setattr("config.config", MagicMock(AUTO_TAGS={"solo"}))
+        monkeypatch.setattr("config.config", MagicMock(TAGS={"solo"}))
         metadata = {"prompt": "solo character", "tags": ["existing_tag"]}
-        auto_add_tags_from_prompt(sample_image_path, metadata)
+        add_tags_from_prompt(sample_image_path, metadata)
         
         assert "existing_tag" in metadata["tags"]
     
     def test_auto_add_tags_similarity_matching(self, temp_image_folder, sample_image_path, monkeypatch):
         """Тест добавления тегов по похожести."""
-        monkeypatch.setattr("config.config", MagicMock(AUTO_TAGS={"solo"}))
+        monkeypatch.setattr("config.config", MagicMock(TAGS={"solo"}))
         metadata = {"prompt": "sol character"}  # Похоже на "solo"
-        auto_add_tags_from_prompt(sample_image_path, metadata, threshold=0.8)
+        add_tags_from_prompt(sample_image_path, metadata, threshold=0.8)
         
         assert "tags" in metadata
 

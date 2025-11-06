@@ -4,7 +4,6 @@
 import os
 import time
 import logging
-from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 from metadata import load_metadata
 from PIL import Image, UnidentifiedImageError
@@ -30,7 +29,13 @@ def process_image(image_path):
     mtime = os.path.getmtime(image_path)
     metadata = load_metadata(image_path, mtime)
     thumb_path = get_thumbnail_path(image_path)
-    if not os.path.exists(thumb_path) or mtime > os.path.getmtime(thumb_path):
+    # Используем уже полученный mtime вместо повторного вызова
+    try:
+        thumb_mtime = os.path.getmtime(thumb_path) if os.path.exists(thumb_path) else 0
+        if mtime > thumb_mtime:
+            create_thumbnail(image_path, thumb_path)
+    except OSError:
+        # Если миниатюра не существует или ошибка доступа
         create_thumbnail(image_path, thumb_path)
     return {
         "filename": get_relative_path(image_path),
@@ -44,13 +49,18 @@ def _get_image_paths(folder=None):
         if not os.path.isdir(folder):
             logger.warning(f"Указанный путь не является директорией: {folder}")
             return []
-        paths = os.listdir(folder)
-        return [
-            os.path.join(folder, f) 
-            for f in paths 
-            if os.path.isfile(os.path.join(folder, f)) and 
-               os.path.splitext(f)[1].lower() in config.ALLOWED_EXTENSIONS
-        ]
+        # Используем os.scandir для более эффективного обхода
+        paths = []
+        try:
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    if entry.is_file():
+                        ext = os.path.splitext(entry.name)[1].lower()
+                        if ext in config.ALLOWED_EXTENSIONS:
+                            paths.append(entry.path)
+        except OSError as e:
+            logger.warning(f"Ошибка чтения директории {folder}: {e}")
+        return paths
     else:
         return list(walk_images())
 
@@ -71,8 +81,12 @@ def needs_processing(folder=None):
             thumb_path = get_thumbnail_path(image_path)
             meta_path = get_metadata_path(image_path)
             
-            # Проверяем миниатюру
-            if not os.path.exists(thumb_path) or mtime > os.path.getmtime(thumb_path):
+            # Проверяем миниатюру (используем уже полученный mtime)
+            try:
+                thumb_mtime = os.path.getmtime(thumb_path) if os.path.exists(thumb_path) else 0
+                if mtime > thumb_mtime:
+                    return True
+            except OSError:
                 return True
             
             # Проверяем метаданные
@@ -99,32 +113,33 @@ def collect_images(folder=None, progress_callback=None):
     results = []
     processed = 0
     
-    if progress_callback:
-        # Используем обычный map для возможности отслеживания прогресса
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = [pool.submit(process_image, path) for path in image_paths]
-            for future in futures:
-                result = future.result()
-                results.append(result)
-                processed += 1
-                if progress_callback:
-                    progress_callback(processed, total, f"Обработка {processed}/{total}")
-    else:
-        # Старый способ с tqdm для консоли
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            for result in tqdm(pool.map(process_image, image_paths), total=len(image_paths), desc="Обработка изображений"):
-                results.append(result)
+    # Используем ThreadPoolExecutor для параллельной обработки
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [pool.submit(process_image, path) for path in image_paths]
+        for future in futures:
+            result = future.result()
+            results.append(result)
+            processed += 1
+            if progress_callback:
+                progress_callback(processed, total, f"Обработка {processed}/{total}")
     
     return results
 
 def sort_images(images, sort_by, order):
     reverse = (order == "desc")
+    
+    # Кэшируем mtime для сортировки по дате, чтобы избежать повторных вызовов
+    mtime_cache = {}
     def safe_get_mtime(img):
-        try:
-            return os.path.getmtime(get_absolute_path(img["filename"]))
-        except Exception as e:
-            logger.error(f"Ошибка safe_get_mtime: {e}")
-            return 0
+        filename = img["filename"]
+        if filename not in mtime_cache:
+            try:
+                mtime_cache[filename] = os.path.getmtime(get_absolute_path(filename))
+            except Exception as e:
+                logger.error(f"Ошибка safe_get_mtime: {e}")
+                mtime_cache[filename] = 0
+        return mtime_cache[filename]
+    
     key_funcs = {
         "date": safe_get_mtime,
         "filename": lambda img: img["filename"].lower(),

@@ -1,0 +1,21 @@
+{
+    "terminal.integrated.defaultProfile.windows": "Command Prompt",
+    "terminal.integrated.profiles.windows": {
+        "Command Prompt": {
+            "path": "${env:COMSPEC}",
+            "args": []
+        },
+        "PowerShell": {
+            "source": "PowerShell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass"
+            ]
+        }
+    },
+    "python.terminal.activateEnvironment": false,
+    "python.condaPath": "${env:CONDA_EXE}",
+    "python.terminal.activateEnvInCurrentTerminal": false
+}
+

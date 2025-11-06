@@ -75,7 +75,7 @@ const progressBar = {
                     if (this.taskId && DOM.progressContainer && !DOM.progressContainer.classList.contains("hidden")) {
                         this.close();
                     }
-                }, 1000);
+                }, 500);
             }
         };
     },
@@ -93,11 +93,11 @@ const progressBar = {
             
             if (status === "completed") {
                 if (DOM.progressMessage) DOM.progressMessage.textContent = "Обработка завершена успешно";
-                setTimeout(() => this.close(), 1500);
+                setTimeout(() => this.close(), 300);
             } else {
                 if (DOM.progressMessage) DOM.progressMessage.textContent = `Ошибка: ${message || "Неизвестная ошибка"}`;
                 if (DOM.progressBar) DOM.progressBar.style.background = "#ff4444";
-                setTimeout(() => this.close(), 2000);
+                setTimeout(() => this.close(), 1500);
             }
         }
     },
@@ -105,7 +105,7 @@ const progressBar = {
     updateError(errorMessage) {
         if (DOM.progressMessage) DOM.progressMessage.textContent = `Ошибка: ${errorMessage}`;
         if (DOM.progressBar) DOM.progressBar.style.background = "#ff4444";
-        setTimeout(() => this.close(), 3000);
+        setTimeout(() => this.close(), 2000);
     },
 
     show() {
@@ -120,6 +120,9 @@ const progressBar = {
         DOM.progressBar.style.background = "";
         DOM.progressText.textContent = "0 / 0";
         DOM.progressPercentage.textContent = "0%";
+        
+        // Блокируем переключение папок
+        this.blockNavigation();
     },
 
     close() {
@@ -128,6 +131,103 @@ const progressBar = {
             DOM.progressContainer.classList.add("hidden");
         }
         this.taskId = null;
+        
+        // Разблокируем переключение папок
+        this.unblockNavigation();
+    },
+
+    blockNavigation() {
+        // Блокируем все контролы сайдбара
+        const sidebar = DOM.sidebar;
+        if (!sidebar) return;
+
+        // Блокируем ссылки папок
+        sidebar.querySelectorAll(".folder-tree a").forEach(link => {
+            link.classList.add("disabled");
+            link.style.pointerEvents = "none";
+            link.style.opacity = "0.5";
+        });
+
+        // Блокируем кнопки разворачивания папок
+        sidebar.querySelectorAll(".folder-toggle").forEach(toggle => {
+            toggle.style.pointerEvents = "none";
+            toggle.style.opacity = "0.5";
+            toggle.style.cursor = "not-allowed";
+        });
+
+        // Блокируем поле поиска
+        if (DOM.searchBox) {
+            DOM.searchBox.disabled = true;
+            DOM.searchBox.style.opacity = "0.5";
+            DOM.searchBox.style.cursor = "not-allowed";
+        }
+
+        // Блокируем выпадающий список сортировки
+        if (DOM.sortSelect) {
+            DOM.sortSelect.disabled = true;
+            DOM.sortSelect.style.opacity = "0.5";
+            DOM.sortSelect.style.cursor = "not-allowed";
+        }
+
+        // Блокируем кнопки действий
+        sidebar.querySelectorAll("button.reset-checkboxes-btn, button.delete-metadata-btn").forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+        });
+
+        // Блокируем кнопку закрытия сайдбара (опционально, можно оставить работающей)
+        // if (DOM.menuToggle) {
+        //     DOM.menuToggle.disabled = true;
+        //     DOM.menuToggle.style.opacity = "0.5";
+        // }
+    },
+
+    unblockNavigation() {
+        // Разблокируем все контролы сайдбара
+        const sidebar = DOM.sidebar;
+        if (!sidebar) return;
+
+        // Разблокируем ссылки папок
+        sidebar.querySelectorAll(".folder-tree a").forEach(link => {
+            link.classList.remove("disabled");
+            link.style.pointerEvents = "";
+            link.style.opacity = "";
+        });
+
+        // Разблокируем кнопки разворачивания папок
+        sidebar.querySelectorAll(".folder-toggle").forEach(toggle => {
+            toggle.style.pointerEvents = "";
+            toggle.style.opacity = "";
+            toggle.style.cursor = "";
+        });
+
+        // Разблокируем поле поиска
+        if (DOM.searchBox) {
+            DOM.searchBox.disabled = false;
+            DOM.searchBox.style.opacity = "";
+            DOM.searchBox.style.cursor = "";
+        }
+
+        // Разблокируем выпадающий список сортировки
+        if (DOM.sortSelect) {
+            DOM.sortSelect.disabled = false;
+            DOM.sortSelect.style.opacity = "";
+            DOM.sortSelect.style.cursor = "";
+        }
+
+        // Разблокируем кнопки действий
+        sidebar.querySelectorAll("button.reset-checkboxes-btn, button.delete-metadata-btn").forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = "";
+            btn.style.cursor = "";
+        });
+
+        // Разблокируем кнопку закрытия сайдбара
+        // if (DOM.menuToggle) {
+        //     DOM.menuToggle.disabled = false;
+        //     DOM.menuToggle.style.opacity = "";
+        // }
     },
 
     disconnect() {

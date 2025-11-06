@@ -10,6 +10,9 @@ from exceptions import FileOperationError
 logger = logging.getLogger(__name__)
 
 
+# Кэш для созданных директорий, чтобы избежать повторных вызовов os.makedirs
+_created_dirs_cache = set()
+
 def get_metadata_file_path(image_path: str, ext: str) -> str:
     """
     Возвращает путь к файлу метаданных в папке .metadata с сохранением структуры подпапок.
@@ -45,8 +48,10 @@ def get_metadata_file_path(image_path: str, ext: str) -> str:
         else:
             meta_dir = meta_base
         
-        # Создаем директорию если её нет
-        os.makedirs(meta_dir, exist_ok=True)
+        # Создаем директорию если её нет (с кэшированием)
+        if meta_dir not in _created_dirs_cache:
+            os.makedirs(meta_dir, exist_ok=True)
+            _created_dirs_cache.add(meta_dir)
         
         # Получаем имя файла без расширения и добавляем новое расширение
         base_name = os.path.splitext(filename)[0]

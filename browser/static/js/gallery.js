@@ -181,6 +181,12 @@ const gallery = {
     },
 
     filter() {
+        // Блокируем фильтрацию во время генерации метаданных
+        if (progressBar.taskId) {
+            toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
+            return;
+        }
+        
         state.searchQuery = DOM.searchBox.value.trim();
         state.sortBy = DOM.sortSelect.value;
         gallery.load();
@@ -230,6 +236,12 @@ const gallery = {
     },
 
     async uncheckAll() {
+        // Блокируем сброс чекбоксов во время генерации метаданных
+        if (progressBar.taskId) {
+            toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
+            return;
+        }
+        
         const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
         const searchQuery = state.searchQuery || "";
 
@@ -259,6 +271,12 @@ const gallery = {
     },
 
     async deleteMetadata() {
+        // Блокируем удаление метаданных во время генерации метаданных
+        if (progressBar.taskId) {
+            toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
+            return;
+        }
+        
         const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
         const searchQuery = state.searchQuery || "";
 
