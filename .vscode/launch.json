@@ -15,6 +15,63 @@
             },
             "python": "${command:python.interpreterPath}",
             "subProcess": true
+        },
+        {
+            "name": "🧪 Pytest: Запустить все тесты",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests",
+                "-v",
+                "--tb=short"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}/browser",
+            "python": "${command:python.interpreterPath}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/browser"
+            }
+        },
+        {
+            "name": "🧪 Pytest: Запустить все тесты с покрытием",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests",
+                "-v",
+                "--tb=short",
+                "--cov=.",
+                "--cov-report=html",
+                "--cov-report=term"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}/browser",
+            "python": "${command:python.interpreterPath}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/browser"
+            }
+        },
+        {
+            "name": "🧪 Pytest: Запустить текущий тест",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}",
+                "-v",
+                "--tb=short"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}/browser",
+            "python": "${command:python.interpreterPath}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/browser"
+            }
         }
     ]
 }
