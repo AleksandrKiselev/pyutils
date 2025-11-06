@@ -1,0 +1,18 @@
+const DOM = {
+    gallery: document.getElementById("gallery"),
+    sidebar: document.getElementById("sidebar"),
+    loading: document.getElementById("loading"),
+    searchBox: document.getElementById("search-box"),
+    sortSelect: document.getElementById("sort-select"),
+    scrollToTop: document.getElementById("scroll-to-top"),
+    menuToggle: document.getElementById("menu-toggle"),
+    menuToggleFloating: document.getElementById("menu-toggle-floating"),
+    fullscreenContainer: document.getElementById("fullscreen-container"),
+    fullscreenImg: document.getElementById("fullscreen-img"),
+    fullscreenPrompt: document.getElementById("fullscreen-prompt"),
+    fullscreenCheckbox: document.getElementById("fullscreen-checkbox"),
+    fullscreenTagsDisplay: document.getElementById("fullscreen-tags-display"),
+    fullscreenRating: document.getElementById("fullscreen-rating"),
+    toast: document.getElementById("toast")
+};
+

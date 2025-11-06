@@ -1,0 +1,7 @@
+const LIMIT = 50;
+const SCROLL_THRESHOLD = 800;
+const SCROLL_TO_TOP_THRESHOLD = 300;
+const STARRED_SYMBOL = "★";
+const UNSTARRED_SYMBOL = "☆";
+const MAX_RATING = 5;
+

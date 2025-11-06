@@ -7,17 +7,13 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <!-- Sidebar -->
     <aside id="sidebar" class="sidebar">
-        <!-- Sidebar Header with Toggle Button -->
         <div class="sidebar-header">
             <button id="menu-toggle" class="sidebar-toggle" title="Закрыть панель">
                 <span id="menu-icon">⯇</span>
             </button>
         </div>
-        <!-- Sidebar Content -->
         <div class="sidebar-content">
-            <!-- Search and Sort -->
             <div class="search-sort-bar">
                 <div class="search-sort-center">
                     <div class="search-container">
@@ -72,29 +68,20 @@
         </div>
     </aside>
 
-    <!-- Основной контент -->
     <div class="container">
-        <!-- Sidebar Toggle Button (floating, when sidebar is closed) -->
         <button id="menu-toggle-floating" class="menu-toggle-floating" title="Открыть панель">
             <span id="menu-icon-floating">⯈</span>
         </button>
 
-        <!-- Scroll to top button -->
         <div id="scroll-buttons">
             <button id="scroll-to-top" onclick="scrollToTop()">▲</button>
         </div>
 
-        <!-- Loading indicator -->
-        <div id="loading">Loading...</div>
-
-        <!-- Toast notification -->
+        <div id="loading">Загрузка...</div>
         <div id="toast" class="toast"></div>
-
-        <!-- Gallery -->
         <main id="gallery" class="gallery"></main>
     </div>
 
-    <!-- Fullscreen image viewer -->
     <div class="fullscreen-img" id="fullscreen-container">
         <div class="fullscreen-image-wrapper">
             <div class="image-buttons fullscreen-buttons">
@@ -120,6 +107,22 @@
         <button class="nav-arrow nav-right" onclick="nextImage()">▶</button>
     </div>
 
-    <script src="/static/script.js"></script>
+    <script src="/static/js/config.js"></script>
+    <script src="/static/js/dom.js"></script>
+    <script src="/static/js/state.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/stateManager.js"></script>
+    <script src="/static/js/toast.js"></script>
+    <script src="/static/js/rating.js"></script>
+    <script src="/static/js/clipboard.js"></script>
+    <script src="/static/js/favorites.js"></script>
+    <script src="/static/js/folders.js"></script>
+    <script src="/static/js/gallery.js"></script>
+    <script src="/static/js/fullscreen.js"></script>
+    <script src="/static/js/tags.js"></script>
+    <script src="/static/js/navigation.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/keyboard.js"></script>
+    <script src="/static/js/main.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 """
-Metadata extraction, loading, and saving for images in the browser application.
+Извлечение, загрузка и сохранение метаданных изображений.
 """
 import json
 import os
@@ -17,30 +17,19 @@ logger = logging.getLogger(__name__)
 
 
 def extract_prompt_from_png(image_path: str) -> str:
-    """
-    Extract the prompt string from PNG metadata chunks.
-    
-    Reads PNG chunks (zTXt, tEXt, iTXt) and extracts prompt from JSON metadata.
-    
-    Args:
-        image_path: Absolute path to the PNG image file
-        
-    Returns:
-        Extracted prompt string, or "No metadata found" if extraction fails
-    """
     try:
         with open(image_path, "rb") as f:
             data = f.read()
 
         chunks: list = []
-        offset = 8  # Skip PNG signature
+        offset = 8
         
         while offset < len(data):
             try:
                 length = struct.unpack("!I", data[offset:offset+4])[0]
                 chunk_type = data[offset+4:offset+8].decode("utf-8", "ignore")
                 chunk_data = data[offset+8:offset+8+length]
-                offset += 8 + length + 4  # +4 for CRC
+                offset += 8 + length + 4
 
                 if chunk_type == "zTXt":
                     try:
@@ -49,50 +38,27 @@ def extract_prompt_from_png(image_path: str) -> str:
                         decompressed = zlib.decompress(compressed).decode("utf-8", "ignore")
                         chunks.append(decompressed)
                     except (ValueError, zlib.error) as e:
-                        logger.warning(f"Failed decompressing zTXt chunk in {image_path}: {e}")
+                        logger.warning(f"Не удалось распаковать zTXt чанк в {image_path}: {e}")
                 elif chunk_type in ("tEXt", "iTXt"):
                     chunks.append(chunk_data.decode("utf-8", "ignore"))
             except (struct.error, IndexError, UnicodeDecodeError) as e:
-                logger.warning(f"Error parsing PNG chunk at offset {offset} in {image_path}: {e}")
+                logger.warning(f"Ошибка парсинга PNG чанка на смещении {offset} в {image_path}: {e}")
                 break
 
         metadata = "".join(chunks).strip()
         pattern = r'"title"\s*:\s*"PromptTextForBrowser",.*?"widgets_values"\s*:\s*\[\s*\[\s*"([^"]+)"\s*\]\s*\]'
         match = re.search(pattern, metadata, re.DOTALL)
-        return match.group(1).strip() if match else "No metadata found"
+        return match.group(1).strip() if match else "Метаданные не найдены"
     except IOError as e:
-        logger.error(f"Error reading file {image_path}: {e}")
-        return "No metadata found"
+        logger.error(f"Ошибка чтения файла {image_path}: {e}")
+        return "Метаданные не найдены"
     except Exception as e:
-        logger.error(f"Unexpected error extracting prompt from {image_path}: {e}")
-        return "No metadata found"
+        logger.error(f"Неожиданная ошибка извлечения промпта из {image_path}: {e}")
+        return "Метаданные не найдены"
 
 
 @lru_cache(maxsize=512)
 def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
-    """
-    Load metadata for an image, creating defaults if necessary.
-    
-    Uses LRU cache for performance. Cache key includes mtime to invalidate
-    when file is modified. Cache should be cleared manually when metadata
-    is updated externally.
-    
-    Args:
-        image_path: Absolute path to the image file
-        mtime: File modification time (used for cache invalidation)
-        
-    Returns:
-        Dictionary containing image metadata:
-        {
-            "prompt": str,
-            "checked": bool,
-            "rating": int,
-            "tags": list[str]
-        }
-        
-    Raises:
-        FileOperationError: If metadata file operations fail
-    """
     path = get_metadata_path(image_path)
     metadata: Dict[str, Any] = {}
     modified = False
@@ -102,13 +68,12 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
             with open(path, "r", encoding="utf-8") as f:
                 metadata = json.load(f)
         except json.JSONDecodeError as e:
-            logger.warning(f"Corrupted metadata file: {path}, error: {e}")
+            logger.warning(f"Поврежденный файл метаданных: {path}, ошибка: {e}")
             metadata = {}
         except IOError as e:
-            logger.warning(f"Error reading metadata file: {path}, error: {e}")
+            logger.warning(f"Ошибка чтения файла метаданных: {path}, ошибка: {e}")
             metadata = {}
 
-    # Set defaults for missing fields
     if "prompt" not in metadata:
         metadata["prompt"] = extract_prompt_from_png(image_path)
         modified = True
@@ -122,7 +87,7 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
         try:
             auto_add_tags_from_prompt(image_path, metadata)
         except Exception as e:
-            logger.error(f"Error auto-adding tags for {image_path}: {e}")
+            logger.error(f"Ошибка автоматического добавления тегов для {image_path}: {e}")
             metadata["tags"] = []
         modified = True
 
@@ -130,33 +95,22 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
         try:
             save_metadata(image_path, metadata)
         except FileOperationError:
-            # Logged in save_metadata, but don't fail load
             pass
 
     return metadata
 
 
 def save_metadata(image_path: str, metadata: Dict[str, Any]) -> None:
-    """
-    Save metadata for an image to a JSON file.
-    
-    Args:
-        image_path: Absolute path to the image file
-        metadata: Dictionary containing metadata to save
-        
-    Raises:
-        FileOperationError: If file write operations fail
-    """
     path = get_metadata_path(image_path)
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=4)
     except IOError as e:
-        error_msg = f"Error saving metadata to {path}: {e}"
+        error_msg = f"Ошибка сохранения метаданных в {path}: {e}"
         logger.error(error_msg)
         raise FileOperationError(error_msg) from e
     except Exception as e:
-        error_msg = f"Unexpected error saving metadata to {path}: {e}"
+        error_msg = f"Неожиданная ошибка сохранения метаданных в {path}: {e}"
         logger.error(error_msg)
         raise FileOperationError(error_msg) from e

@@ -1,5 +1,5 @@
 """
-API routes for the image browser application.
+API маршруты для приложения просмотра изображений.
 """
 import os
 import logging
@@ -26,75 +26,51 @@ routes = Blueprint("routes", __name__)
 
 @routes.errorhandler(PathNotFoundError)
 def handle_path_not_found(error: PathNotFoundError):
-    """Handle path not found errors."""
     return jsonify({"error": str(error)}), 404
 
 
 @routes.errorhandler(InvalidRequestError)
 def handle_invalid_request(error: InvalidRequestError):
-    """Handle invalid request errors."""
     return jsonify({"error": str(error)}), 400
 
 
 @routes.errorhandler(FileOperationError)
 def handle_file_operation_error(error: FileOperationError):
-    """Handle file operation errors."""
-    logger.error(f"File operation error: {error}")
+    logger.error(f"Ошибка операции с файлом: {error}")
     return jsonify({"error": str(error)}), 500
 
 
 @routes.route("/")
 @routes.route("/<path:subpath>")
 def index(subpath: str = ""):
-    """
-    Render the main page with the folder tree and image grid.
-    
-    Args:
-        subpath: Optional subpath within the image folder
-        
-    Returns:
-        Rendered HTML template or error response
-    """
     try:
         folder_path = get_absolute_path(subpath)
         if not os.path.isdir(folder_path):
-            raise PathNotFoundError("Path does not exist")
+            raise PathNotFoundError("Путь не существует")
         
         return render_template(
             "index.html",
             folder_tree=build_folder_tree(config.IMAGE_FOLDER)
         )
     except Exception as e:
-        logger.exception(f"Error rendering index page: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        logger.exception(f"Ошибка рендеринга главной страницы: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 
 @routes.route("/images/<path:subpath>")
 def get_images(subpath: str = ""):
-    """
-    Return a JSON list of images for the given folder, with filtering, sorting, and pagination.
-    
-    Args:
-        subpath: Optional subpath within the image folder
-        
-    Returns:
-        JSON response with list of images
-    """
     try:
         folder_path = get_absolute_path(subpath)
         if not os.path.isdir(folder_path):
-            raise PathNotFoundError("Path does not exist")
+            raise PathNotFoundError("Путь не существует")
         
-        # Validate and extract parameters
         limit, offset = validate_pagination_params(request, config.ITEMS_PER_PAGE)
         sort_by, order = validate_sort_params(request)
         raw_search = request.args.get("search", "")
         scope, search = validate_search_query(raw_search)
         
-        # Determine folder path (None for global search)
         search_folder_path = None if scope == "global" else folder_path
         
-        # Get images using service
         images = ImageService.get_images(
             folder_path=search_folder_path,
             search=search,
@@ -105,46 +81,31 @@ def get_images(subpath: str = ""):
         )
         
         return jsonify(images)
-    except (PathNotFoundError, InvalidRequestError) as e:
+    except (PathNotFoundError, InvalidRequestError):
         raise
     except Exception as e:
-        logger.exception(f"Error getting images: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        logger.exception(f"Ошибка получения изображений: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 
 @routes.route("/serve_image/<path:filename>")
 @routes.route("/serve_thumbnail/<path:filename>")
 def serve_file(filename: str):
-    """
-    Serve the original image or its thumbnail from the static folder.
-    
-    Args:
-        filename: Relative filename of the image
-        
-    Returns:
-        File response or error response
-    """
     try:
         path = get_absolute_path(filename)
         if not os.path.exists(path):
-            raise PathNotFoundError("File not found")
+            raise PathNotFoundError("Файл не найден")
         
         return send_from_directory(config.IMAGE_FOLDER, filename)
     except PathNotFoundError:
         raise
     except Exception as e:
-        logger.exception(f"Error serving file: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        logger.exception(f"Ошибка отдачи файла: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 
 @routes.route("/delete_image", methods=["POST"])
 def delete_image():
-    """
-    Delete an image and its associated thumbnail and metadata files.
-    
-    Returns:
-        JSON response with success status
-    """
     try:
         data = validate_json_request(request)
         filename = validate_filename(data)
@@ -154,51 +115,38 @@ def delete_image():
     except (InvalidRequestError, FileOperationError):
         raise
     except Exception as e:
-        logger.exception(f"Error deleting image: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        logger.exception(f"Ошибка удаления изображения: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 
 @routes.route("/update_metadata", methods=["POST"])
 def update_metadata():
-    """
-    Update metadata (checked, rating, tags) for one or more images.
-    
-    Returns:
-        JSON response with success status
-    """
     try:
         data = validate_json_request(request)
         filenames = data.get("filenames") or [data.get("filename")]
         
         if not filenames or not isinstance(filenames, list):
-            raise InvalidRequestError("No filenames provided")
+            raise InvalidRequestError("Не указаны имена файлов")
         
-        # Extract metadata updates
         updates = {}
         for key in ("checked", "rating", "tags"):
             if key in data:
                 updates[key] = data[key]
         
         if not updates:
-            raise InvalidRequestError("No metadata fields to update")
+            raise InvalidRequestError("Нет полей метаданных для обновления")
         
         MetadataService.update_metadata(filenames, updates)
         return jsonify({"success": True})
     except (InvalidRequestError, FileOperationError):
         raise
     except Exception as e:
-        logger.exception(f"Error updating metadata: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        logger.exception(f"Ошибка обновления метаданных: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 
 @routes.route("/copy_to_favorites", methods=["POST"])
 def copy_to_favorites():
-    """
-    Copy an image and its metadata to the favorites folder, adding the 'favorite' tag.
-    
-    Returns:
-        JSON response with success status
-    """
     try:
         data = validate_json_request(request)
         filename = validate_filename(data)
@@ -208,63 +156,47 @@ def copy_to_favorites():
     except (InvalidRequestError, FileOperationError):
         raise
     except Exception as e:
-        logger.exception(f"Error copying to favorites: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        logger.exception(f"Ошибка копирования в избранное: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 
 @routes.route("/all_tags")
 def get_all_tags():
-    """
-    Return a JSON list of all unique tags in the dataset.
-    
-    Returns:
-        JSON response with list of tags
-    """
     try:
         return jsonify(get_all_tags_cached())
     except Exception as e:
-        logger.exception(f"Error getting tags: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        logger.exception(f"Ошибка получения тегов: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 
 @routes.route("/uncheck_all", methods=["POST"])
 def uncheck_all():
-    """
-    Uncheck all images in the given folder (or globally) matching the search query.
-    
-    Returns:
-        JSON response with success status and count of unchecked images
-    """
     try:
         data = validate_json_request(request)
         subpath = data.get("path", "")
         raw_search = data.get("search", "")
         
-        # Decode URL-encoded path
         if subpath:
             subpath = unquote(subpath)
         
-        # Validate and get folder path
         try:
             folder_path = get_absolute_path(subpath)
             folder_path = os.path.normpath(folder_path)
             
             if not os.path.isdir(folder_path):
-                raise PathNotFoundError(f"Path does not exist: {folder_path}")
+                raise PathNotFoundError(f"Путь не существует: {folder_path}")
         except Exception as e:
-            logger.exception(f"Error processing path: {e}")
-            raise InvalidRequestError(f"Error processing path: {str(e)}")
+            logger.exception(f"Ошибка обработки пути: {e}")
+            raise InvalidRequestError(f"Ошибка обработки пути: {str(e)}")
         
-        # Parse search query
         scope, search = validate_search_query(raw_search)
         search_folder_path = None if scope == "global" else folder_path
         
-        # Uncheck images using service
         count = MetadataService.uncheck_all(search_folder_path, search)
         
         return jsonify({"success": True, "count": count})
     except (PathNotFoundError, InvalidRequestError):
         raise
     except Exception as e:
-        logger.exception(f"Error unchecking all: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        logger.exception(f"Ошибка снятия отметок: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500

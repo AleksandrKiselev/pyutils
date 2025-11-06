@@ -1,5 +1,5 @@
 """
-Image processing utilities for the image browser application: thumbnails, sorting, filtering, and collection.
+Утилиты обработки изображений: миниатюры, сортировка, фильтрация и сбор.
 """
 import os
 import time
@@ -14,7 +14,6 @@ from config import config
 logger = logging.getLogger(__name__)
 
 def create_thumbnail(image_path, thumb_path):
-    """Create a thumbnail for the given image and save it as WEBP."""
     for _ in range(5):
         try:
             with Image.open(image_path) as img:
@@ -23,12 +22,11 @@ def create_thumbnail(image_path, thumb_path):
                 img.save(thumb_path, "WEBP")
                 return
         except (OSError, UnidentifiedImageError):
-            logger.warning(f"Waiting on file {image_path}")
+            logger.warning(f"Ожидание файла {image_path}")
             time.sleep(1)
-    logger.error(f"Thumbnail creation failed: {image_path}")
+    logger.error(f"Не удалось создать миниатюру: {image_path}")
 
 def process_image(image_path):
-    """Process an image: ensure thumbnail exists and return its metadata."""
     mtime = os.path.getmtime(image_path)
     metadata = load_metadata(image_path, mtime)
     thumb_path = get_thumbnail_path(image_path)
@@ -41,7 +39,6 @@ def process_image(image_path):
     }
 
 def collect_images(folder=None):
-    """Collect and process all images in the given folder (or recursively if None)."""
     image_paths = []
     if folder:
         paths = os.listdir(folder)
@@ -55,18 +52,18 @@ def collect_images(folder=None):
         image_paths = list(walk_images())
     results = []
     with ThreadPoolExecutor(max_workers=10) as pool:
-        for result in tqdm(pool.map(process_image, image_paths), total=len(image_paths), desc="Processing images"):
+        for result in tqdm(pool.map(process_image, image_paths), total=len(image_paths), desc="Обработка изображений"):
             results.append(result)
     return results
 
 def sort_images(images, sort_by, order):
-    """Sort a list of image dicts by the given field and order."""
     reverse = (order == "desc")
     def safe_get_mtime(img):
         try:
             return os.path.getmtime(get_absolute_path(img["filename"]))
         except Exception as e:
-            logger.error(f"Error safe_get_mtime: {e}")
+            logger.error(f"Ошибка safe_get_mtime: {e}")
+            return 0
     key_funcs = {
         "date": safe_get_mtime,
         "filename": lambda img: img["filename"].lower(),
@@ -79,7 +76,6 @@ def sort_images(images, sort_by, order):
     return images
 
 def filter_images(images, search):
-    """Filter images by search string (supports tag and prompt search)."""
     search = search.strip().lower()
     if not search:
         return images
@@ -89,7 +85,6 @@ def filter_images(images, search):
         raw = search.split(":", 1)[1].strip().lower()
         if not raw:
             return [img for img in images if not img["metadata"].get("tags")]
-        # Split into groups: each group is a disjunction of tags
         groups = [
             [normalize(t) for t in part.split("|") if t]
             for part in raw.split(",") if part
