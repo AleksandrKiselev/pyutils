@@ -31,15 +31,11 @@ def get_image_tags(image_path: str) -> Set[str]:
             width, height = img.size
             orientation = "landscape" if width >= height else "portrait"
             resolution = f"{width}x{height}"
-            return {orientation, resolution}
+        ext = os.path.splitext(image_path)[1].lower().lstrip(".")
+        return {orientation, resolution, ext}
     except Exception as e:
         logger.warning(f"Не удалось получить теги изображения для {image_path}: {e}")
         return set()
-
-
-def extract_seed(image_path: str) -> str:
-    base = os.path.basename(image_path)
-    return os.path.splitext(base)[0]
 
 
 def add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], threshold: float = 0.9) -> None:
@@ -63,6 +59,4 @@ def add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], threshold: f
 
         prompt_tags = {tag for tag in all_tags if check_tag(tag)}
 
-    image_tags = get_image_tags(image_path)
-    image_tags.add(extract_seed(image_path))
-    metadata["tags"] = sorted(prompt_tags) + list(image_tags)
+    metadata["tags"] = sorted(prompt_tags) + list(get_image_tags(image_path))
