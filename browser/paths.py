@@ -69,7 +69,33 @@ def get_thumbnail_path(image_path: str) -> str:
 def get_absolute_path(relative_path: str, root_folder: Optional[str] = None) -> str:
     if root_folder is None:
         root_folder = config.IMAGE_FOLDER
-    return os.path.join(root_folder, relative_path)
+    
+    # Обработка пустого пути
+    if not relative_path:
+        return os.path.normpath(os.path.abspath(root_folder))
+    
+    # Нормализуем пути для предотвращения path traversal атак
+    root = os.path.normpath(os.path.abspath(root_folder))
+    # Убираем начальные слэши и точки из relative_path
+    relative_path = relative_path.lstrip('/\\')
+    # Убираем '..' из начала пути
+    while relative_path.startswith('..'):
+        relative_path = relative_path[3:].lstrip('/\\')
+    
+    full_path = os.path.normpath(os.path.abspath(os.path.join(root, relative_path)))
+    
+    # Проверяем, что результирующий путь находится внутри root_folder
+    # Нормализуем оба пути для корректного сравнения
+    root_abs = os.path.abspath(root)
+    full_abs = os.path.abspath(full_path)
+    
+    # Проверяем, что full_path начинается с root + разделитель пути
+    # или равен root (для корневой директории)
+    if not (full_abs == root_abs or full_abs.startswith(root_abs + os.sep)):
+        logger.warning(f"Попытка доступа к пути вне корневой директории: {relative_path}")
+        raise FileOperationError(f"Путь находится вне разрешенной директории")
+    
+    return full_path
 
 
 def get_relative_path(absolute_path: str, root_folder: Optional[str] = None) -> str:

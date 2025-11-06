@@ -41,6 +41,9 @@ def process_image(image_path):
 def _get_image_paths(folder=None):
     """Возвращает список путей к изображениям в указанной папке."""
     if folder:
+        if not os.path.isdir(folder):
+            logger.warning(f"Указанный путь не является директорией: {folder}")
+            return []
         paths = os.listdir(folder)
         return [
             os.path.join(folder, f) 

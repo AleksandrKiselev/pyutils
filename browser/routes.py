@@ -111,8 +111,12 @@ def serve_file(filename: str):
         if not os.path.exists(path):
             raise PathNotFoundError("Файл не найден")
         
+        # Дополнительная проверка безопасности: убеждаемся, что путь внутри IMAGE_FOLDER
+        if not os.path.abspath(path).startswith(os.path.abspath(config.IMAGE_FOLDER)):
+            raise PathNotFoundError("Доступ к файлу запрещен")
+        
         return send_from_directory(config.IMAGE_FOLDER, filename)
-    except PathNotFoundError:
+    except (PathNotFoundError, FileOperationError):
         raise
     except Exception as e:
         logger.exception(f"Ошибка отдачи файла: {e}")
@@ -208,7 +212,6 @@ def uncheck_all():
         search_folder_path = None if scope == "global" else folder_path
         
         count = MetadataService.uncheck_all(search_folder_path, search)
-        
         return jsonify({"success": True, "count": count})
     except (PathNotFoundError, InvalidRequestError):
         raise

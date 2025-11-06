@@ -100,8 +100,9 @@ def auto_add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], thresho
     auto_tags.update(get_image_tags(image_path))
     auto_tags.add(extract_seed(image_path))
     existing_tags = set(metadata.get("tags", []))
-    combined = sorted(existing_tags.union(prompt_tags)) + list(auto_tags)
-    metadata["tags"] = combined
+    # Объединяем все теги в один set, чтобы избежать дубликатов
+    all_tags = existing_tags.union(prompt_tags).union(auto_tags)
+    metadata["tags"] = sorted(all_tags)
 
 
 @lru_cache(maxsize=1)
