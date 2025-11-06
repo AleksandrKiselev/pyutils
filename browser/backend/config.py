@@ -6,7 +6,7 @@ import os
 from typing import Dict, Any
 
 
-CONFIG_FILE = "config.json"
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
 DEFAULT_CONFIG: Dict[str, Any] = {
     "image_folder": "static/images",
     "favorites_folder": "static/images/favorites",

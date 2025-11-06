@@ -5,10 +5,10 @@
             "name": "🐍 Flask: Запустить приложение",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/browser/app.py",
+            "program": "${workspaceFolder}/browser/backend/app.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceFolder}/browser",
+            "cwd": "${workspaceFolder}/browser/backend",
             "env": {
                 "FLASK_ENV": "development",
                 "FLASK_DEBUG": "true"
@@ -28,10 +28,10 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "cwd": "${workspaceFolder}/browser",
+            "cwd": "${workspaceFolder}/browser/backend",
             "python": "${command:python.interpreterPath}",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/browser"
+                "PYTHONPATH": "${workspaceFolder}/browser/backend"
             }
         },
         {
@@ -49,10 +49,10 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "cwd": "${workspaceFolder}/browser",
+            "cwd": "${workspaceFolder}/browser/backend",
             "python": "${command:python.interpreterPath}",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/browser"
+                "PYTHONPATH": "${workspaceFolder}/browser/backend"
             }
         },
         {
@@ -67,10 +67,10 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "cwd": "${workspaceFolder}/browser",
+            "cwd": "${workspaceFolder}/browser/backend",
             "python": "${command:python.interpreterPath}",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/browser"
+                "PYTHONPATH": "${workspaceFolder}/browser/backend"
             }
         }
     ]

@@ -18,7 +18,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder="static", template_folder="templates")
+# Определяем абсолютные пути к static и templates относительно browser/
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+app = Flask(__name__, static_folder=os.path.join(BASE_DIR, "static"), template_folder=os.path.join(BASE_DIR, "templates"))
 app.register_blueprint(routes)
 app.config.update(load_config())
 
