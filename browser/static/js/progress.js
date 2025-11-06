@@ -22,6 +22,11 @@ const progressBar = {
                 return; // Все изображения уже обработаны
             }
 
+            // Закрываем предыдущий прогресс-бар если он был активен
+            if (this.taskId) {
+                this.close();
+            }
+
             // Запускаем обработку
             const response = await fetch("/process_images", {
                 method: "POST",
@@ -78,7 +83,7 @@ const progressBar = {
     update(data) {
         const { processed, total, status, message, percentage } = data;
 
-        if (DOM.progressMessage) DOM.progressMessage.textContent = message || "Обработка изображений...";
+        if (DOM.progressMessage) DOM.progressMessage.textContent = message || "Обработка изображений…";
         if (DOM.progressText) DOM.progressText.textContent = `${processed} / ${total}`;
         if (DOM.progressPercentage) DOM.progressPercentage.textContent = `${Math.round(percentage)}%`;
         if (DOM.progressBar) DOM.progressBar.style.width = `${percentage}%`;

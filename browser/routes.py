@@ -217,6 +217,39 @@ def uncheck_all():
         return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 
+@routes.route("/delete_metadata", methods=["POST"])
+def delete_metadata():
+    try:
+        data = validate_json_request(request)
+        subpath = data.get("path", "")
+        raw_search = data.get("search", "")
+        
+        if subpath:
+            subpath = unquote(subpath)
+        
+        try:
+            folder_path = get_absolute_path(subpath)
+            folder_path = os.path.normpath(folder_path)
+            
+            if not os.path.isdir(folder_path):
+                raise PathNotFoundError(f"Путь не существует: {folder_path}")
+        except Exception as e:
+            logger.exception(f"Ошибка обработки пути: {e}")
+            raise InvalidRequestError(f"Ошибка обработки пути: {str(e)}")
+        
+        scope, search = validate_search_query(raw_search)
+        search_folder_path = None if scope == "global" else folder_path
+        
+        count = MetadataService.delete_metadata(search_folder_path, search)
+        
+        return jsonify({"success": True, "count": count})
+    except (PathNotFoundError, InvalidRequestError):
+        raise
+    except Exception as e:
+        logger.exception(f"Ошибка удаления метаданных: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
+
+
 @routes.route("/check_processing_needed", methods=["POST"])
 def check_processing_needed():
     """Проверяет, нужна ли обработка изображений для указанной папки."""

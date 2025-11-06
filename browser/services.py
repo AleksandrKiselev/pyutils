@@ -89,6 +89,30 @@ class MetadataService:
         load_metadata.cache_clear()
         get_all_tags_cached.cache_clear()
         return count
+    
+    @staticmethod
+    def delete_metadata(folder_path: Optional[str], search: str) -> int:
+        """Удаляет файлы метаданных для всех изображений в указанной папке или фильтрах."""
+        images = collect_images(None if folder_path is None else folder_path)
+        images = filter_images(images, search)
+        
+        count = 0
+        for img in images:
+            image_path = get_absolute_path(img["filename"])
+            if not os.path.exists(image_path):
+                continue
+                
+            try:
+                meta_path = get_metadata_path(image_path)
+                if os.path.exists(meta_path):
+                    os.remove(meta_path)
+                    count += 1
+            except Exception as e:
+                logger.warning(f"Не удалось удалить метаданные для {img['filename']}: {e}")
+        
+        load_metadata.cache_clear()
+        get_all_tags_cached.cache_clear()
+        return count
 
 
 class FavoritesService:

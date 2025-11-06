@@ -13,12 +13,62 @@ const gallery = {
             DOM.loading.style.display = "none";
         }
         
-        // Запускаем обработку изображений с прогресс-баром только если он не активен
-        if (progressBar && !progressBar.taskId) {
-            progressBar.start().catch(err => console.error("Ошибка запуска прогресс-бара:", err));
-        }
+        // Запускаем обработку изображений с прогресс-баром
+        await gallery.ensureMetadataGenerated();
         
         await gallery.loadMore();
+    },
+
+    /**
+     * Общая функция для запуска генерации метаданных с прогресс-баром.
+     * Всегда показывает прогресс-бар, если нужна обработка.
+     */
+    async ensureMetadataGenerated() {
+        if (!progressBar) {
+            console.warn("Progress bar not available");
+            return;
+        }
+
+        const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
+        
+        try {
+            // Проверяем, нужна ли обработка
+            const checkResponse = await fetch("/check_processing_needed", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ path: currentPath })
+            });
+
+            const { needs_processing } = await checkResponse.json();
+            
+            if (!needs_processing) {
+                return; // Все изображения уже обработаны
+            }
+
+            // Закрываем предыдущий прогресс-бар если он был активен
+            if (progressBar.taskId) {
+                progressBar.close();
+            }
+
+            // Запускаем обработку
+            const response = await fetch("/process_images", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ path: currentPath })
+            });
+
+            const { success, task_id, error } = await response.json();
+            
+            if (!success) {
+                throw new Error(error || "Ошибка запуска обработки");
+            }
+
+            progressBar.taskId = task_id;
+            progressBar.show();
+            progressBar.connect();
+        } catch (error) {
+            console.error("Ошибка запуска обработки:", error);
+        }
     },
 
     async loadMore(limit = LIMIT) {
@@ -205,6 +255,32 @@ const gallery = {
             console.error("Ошибка сброса чекбоксов:", error);
             const errorMessage = error.message || error.toString();
             alert("Ошибка сброса чекбоксов: " + errorMessage);
+        }
+    },
+
+    async deleteMetadata() {
+        const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
+        const searchQuery = state.searchQuery || "";
+
+        if (!confirm("Удалить метаданные для всех изображений в текущей папке/фильтрах? Это действие нельзя отменить.")) {
+            return;
+        }
+
+        try {
+            const result = await utils.apiRequest("/delete_metadata", {
+                body: JSON.stringify({ path: currentPath, search: searchQuery })
+            });
+
+            if (result.success) {
+                alert(`Удалено метаданных: ${result.count || 0}`);
+                // Перезагружаем галерею для обновления отображения
+                // ensureMetadataGenerated() будет вызван внутри gallery.load()
+                gallery.load();
+            }
+        } catch (error) {
+            console.error("Ошибка удаления метаданных:", error);
+            const errorMessage = error.message || error.toString();
+            alert("Ошибка удаления метаданных: " + errorMessage);
         }
     },
 

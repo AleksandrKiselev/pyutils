@@ -8,7 +8,7 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 from metadata import load_metadata
 from PIL import Image, UnidentifiedImageError
-from paths import get_thumbnail_path, get_absolute_path, get_relative_path, walk_images
+from paths import get_thumbnail_path, get_absolute_path, get_relative_path, walk_images, get_metadata_path
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def _get_image_paths(folder=None):
 def needs_processing(folder=None):
     """
     Проверяет, нужна ли обработка изображений в указанной папке.
-    Возвращает True если есть изображения без миниатюр или с устаревшими миниатюрами.
+    Возвращает True если есть изображения без миниатюр, метаданных или с устаревшими миниатюрами.
     """
     image_paths = _get_image_paths(folder)
     
@@ -66,8 +66,14 @@ def needs_processing(folder=None):
         try:
             mtime = os.path.getmtime(image_path)
             thumb_path = get_thumbnail_path(image_path)
+            meta_path = get_metadata_path(image_path)
             
+            # Проверяем миниатюру
             if not os.path.exists(thumb_path) or mtime > os.path.getmtime(thumb_path):
+                return True
+            
+            # Проверяем метаданные
+            if not os.path.exists(meta_path):
                 return True
         except Exception as e:
             logger.warning(f"Ошибка проверки изображения {image_path}: {e}")

@@ -22,7 +22,7 @@ def create_progress_task() -> str:
             "total": 0,
             "processed": 0,
             "status": "starting",  # starting, processing, completed, error
-            "message": "Инициализация...",
+            "message": "Инициализация…",
             "created_at": datetime.now(),
             "error": None
         }

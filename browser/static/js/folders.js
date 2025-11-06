@@ -33,7 +33,62 @@ const folders = {
         document.querySelectorAll(".folder-tree a.active-folder")
             .forEach(el => el.classList.remove("active-folder"));
 
-        const activeLink = document.querySelector(`.folder-tree a[href="${currentPath}"]`);
+        // Функция для нормализации пути (декодирование и нормализация)
+        const normalizePath = (path) => {
+            try {
+                // Убираем начальный слэш и декодируем
+                return decodeURIComponent(path.replace(/^\/+/, ''));
+            } catch (e) {
+                return path.replace(/^\/+/, '');
+            }
+        };
+        
+        // Нормализуем текущий путь
+        const normalizedCurrent = normalizePath(currentPath);
+        
+        // Ищем активную ссылку - проверяем несколько вариантов
+        let activeLink = null;
+        
+        // Вариант 1: точное совпадение с текущим путем
+        activeLink = document.querySelector(`.folder-tree a[href="${currentPath}"]`);
+        
+        // Вариант 2: если не нашли, проверяем все ссылки
+        if (!activeLink) {
+            const allLinks = document.querySelectorAll(".folder-tree a");
+            for (const link of allLinks) {
+                try {
+                    // Используем link.href для получения полного URL, затем извлекаем pathname
+                    // Это гарантирует правильное кодирование
+                    let linkPath;
+                    if (link.href.startsWith('http://') || link.href.startsWith('https://')) {
+                        const linkUrl = new URL(link.href);
+                        linkPath = linkUrl.pathname;
+                    } else {
+                        // Относительный путь - создаем полный URL
+                        const linkUrl = new URL(link.href, window.location.origin);
+                        linkPath = linkUrl.pathname;
+                    }
+                    
+                    // Сравниваем нормализованные пути
+                    const normalizedLink = normalizePath(linkPath);
+                    if (normalizedLink === normalizedCurrent) {
+                        activeLink = link;
+                        break;
+                    }
+                } catch (e) {
+                    // Если не удалось создать URL, пробуем использовать getAttribute
+                    const href = link.getAttribute("href");
+                    if (href) {
+                        const normalizedHref = normalizePath(href);
+                        if (normalizedHref === normalizedCurrent) {
+                            activeLink = link;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
         if (activeLink) {
             activeLink.classList.add("active-folder");
             activeLink.scrollIntoView({ block: "center", behavior: "smooth" });

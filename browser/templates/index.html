@@ -21,20 +21,21 @@
                     </div>
                     <div class="sort-container">
                         <select id="sort-select" onchange="changeSort()">
-                            <option value="date-asc">📅 Старые → Новые</option>
-                            <option value="date-desc" selected>📅 Новые → Старые</option>
-                            <option value="filename-asc">📝 А → Я</option>
-                            <option value="filename-desc">📝 Я → А</option>
-                            <option value="prompt-asc">💬 Промпт А → Я</option>
-                            <option value="prompt-desc">💬 Промпт Я → А</option>
-                            <option value="rating-asc">⭐ Рейтинг 1 → 5</option>
-                            <option value="rating-desc">⭐ Рейтинг 5 → 1</option>
-                            <option value="tags-asc">🏷️ Теги А → Я</option>
-                            <option value="tags-desc">🏷️ Теги Я → А</option>
+                            <option value="date-asc">📅Старые → Новые</option>
+                            <option value="date-desc" selected>📅Новые → Старые</option>
+                            <option value="filename-asc">📝Имя А → Я</option>
+                            <option value="filename-desc">📝Имя Я → А</option>
+                            <option value="prompt-asc">💬Промпт А → Я</option>
+                            <option value="prompt-desc">💬Промпт Я → А</option>
+                            <option value="rating-asc">⭐Рейтинг 1 → 5</option>
+                            <option value="rating-desc">⭐Рейтинг 5 → 1</option>
+                            <option value="tags-asc">🏷️Теги А → Я</option>
+                            <option value="tags-desc">🏷️Теги Я → А</option>
                         </select>
                     </div>
                     <div class="reset-and-folder">
-                        <button onclick="uncheckAllCheckboxes()" class="reset-checkboxes-btn">Reset✅</button>
+                        <button onclick="uncheckAllCheckboxes()" class="reset-checkboxes-btn">Сбросить✅</button>
+                        <button onclick="deleteMetadata()" class="delete-metadata-btn">Удалить⚙️</button>
                     </div>
                 </div>
             </div>
@@ -77,11 +78,11 @@
             <button id="scroll-to-top" onclick="scrollToTop()">▲</button>
         </div>
 
-        <div id="loading">Загрузка...</div>
+        <div id="loading">Загрузка…</div>
         <div id="toast" class="toast"></div>
         <div id="progress-container" class="progress-container hidden">
             <div class="progress-header">
-                <span id="progress-message">Обработка изображений...</span>
+                <span id="progress-message">Обработка изображений…</span>
             </div>
             <div class="progress-bar-wrapper">
                 <div id="progress-bar" class="progress-bar"></div>
