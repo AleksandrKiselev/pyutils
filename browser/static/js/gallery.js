@@ -1,11 +1,17 @@
 const gallery = {
+    _filterTimeout: null, // Таймер для debounce фильтрации
+    
     async load() {
         state.loading = false;
         const currentSortBy = DOM.sortSelect.value;
         if (currentSortBy !== state.sortBy) {
             state.sortBy = currentSortBy;
         }
-        await folders.load();
+        
+        // Запускаем загрузку папок параллельно с проверкой метаданных
+        // Это ускоряет отображение прогресс-бара
+        const foldersPromise = folders.load();
+        
         state.offset = 0;
         state.currentImages = [];
         DOM.gallery.innerHTML = "";
@@ -13,15 +19,18 @@ const gallery = {
             DOM.loading.style.display = "none";
         }
         
-        // Запускаем обработку изображений с прогресс-баром
+        // Запускаем обработку изображений с прогресс-баром (не ждем folders.load)
         await gallery.ensureMetadataGenerated();
+        
+        // Ждем загрузку папок только если она еще не завершилась
+        await foldersPromise;
         
         await gallery.loadMore();
     },
 
     /**
      * Общая функция для запуска генерации метаданных с прогресс-баром.
-     * Всегда показывает прогресс-бар, если нужна обработка.
+     * Показывает прогресс-бар только если действительно нужна обработка.
      */
     async ensureMetadataGenerated() {
         if (!progressBar) {
@@ -32,25 +41,43 @@ const gallery = {
         const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
         
         try {
-            // Проверяем, нужна ли обработка
-            const checkResponse = await fetch("/check_processing_needed", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ path: currentPath })
-            });
-
-            const { needs_processing } = await checkResponse.json();
-            
-            if (!needs_processing) {
-                return; // Все изображения уже обработаны
-            }
-
             // Закрываем предыдущий прогресс-бар если он был активен
             if (progressBar.taskId) {
                 progressBar.close();
             }
 
-            // Запускаем обработку
+            // Сначала проверяем, нужна ли обработка (без показа прогресс-бара)
+            let needs_processing = false;
+            
+            try {
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error("Timeout")), 2000)
+                );
+                
+                const checkResponse = await Promise.race([
+                    fetch("/check_processing_needed", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ path: currentPath })
+                    }),
+                    timeoutPromise
+                ]);
+                
+                const { needs_processing: needs } = await checkResponse.json();
+                needs_processing = needs;
+            } catch (error) {
+                // Если проверка заняла больше 2 секунд или произошла ошибка,
+                // запускаем обработку (безопаснее обработать лишний раз)
+                console.log("Проверка заняла слишком долго или произошла ошибка, запускаем обработку:", error.message);
+                needs_processing = true;
+            }
+            
+            // Если обработка не нужна, просто выходим без показа прогресс-бара
+            if (!needs_processing) {
+                return;
+            }
+
+            // Только если обработка нужна - показываем прогресс-бар и запускаем обработку
             const response = await fetch("/process_images", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -68,6 +95,9 @@ const gallery = {
             progressBar.connect();
         } catch (error) {
             console.error("Ошибка запуска обработки:", error);
+            if (progressBar.taskId) {
+                progressBar.close();
+            }
         }
     },
 
@@ -187,9 +217,46 @@ const gallery = {
             return;
         }
         
-        state.searchQuery = DOM.searchBox.value.trim();
-        state.sortBy = DOM.sortSelect.value;
-        gallery.load();
+        // Очищаем предыдущий таймер
+        if (this._filterTimeout) {
+            clearTimeout(this._filterTimeout);
+        }
+        
+        // Используем debounce для фильтрации (300ms задержка)
+        // Это предотвращает множественные вызовы gallery.load() при быстром вводе
+        this._filterTimeout = setTimeout(async () => {
+            const searchBox = DOM.searchBox;
+            
+            // Сохраняем фокус и позицию курсора перед загрузкой
+            const hadFocus = document.activeElement === searchBox;
+            const cursorPosition = hadFocus ? searchBox.selectionStart : null;
+            const searchValue = searchBox.value; // Сохраняем значение на случай если оно изменится
+            
+            state.searchQuery = searchValue.trim();
+            state.sortBy = DOM.sortSelect.value;
+            
+            await gallery.load();
+            
+            // Восстанавливаем фокус и позицию курсора после загрузки
+            // Всегда восстанавливаем фокус, если поле было в фокусе до загрузки
+            if (hadFocus && cursorPosition !== null && DOM.searchBox && document.body.contains(DOM.searchBox)) {
+                // Используем requestAnimationFrame для восстановления фокуса после обновления DOM
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        if (DOM.searchBox && document.body.contains(DOM.searchBox)) {
+                            // Восстанавливаем значение, если оно было изменено stateManager.restore()
+                            // или другими операциями во время загрузки
+                            if (DOM.searchBox.value !== searchValue) {
+                                DOM.searchBox.value = searchValue;
+                            }
+                            DOM.searchBox.focus();
+                            const finalCursorPosition = Math.min(cursorPosition, DOM.searchBox.value.length);
+                            DOM.searchBox.setSelectionRange(finalCursorPosition, finalCursorPosition);
+                        }
+                    });
+                });
+            }
+        }, 300);
     },
 
     async deleteThumbnail(event, filename) {

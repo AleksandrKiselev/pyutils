@@ -5,49 +5,6 @@ const progressBar = {
     eventSource: null,
     taskId: null,
 
-    async start() {
-        const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
-        
-        try {
-            // Проверяем, нужна ли обработка
-            const checkResponse = await fetch("/check_processing_needed", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ path: currentPath })
-            });
-
-            const { needs_processing } = await checkResponse.json();
-            
-            if (!needs_processing) {
-                return; // Все изображения уже обработаны
-            }
-
-            // Закрываем предыдущий прогресс-бар если он был активен
-            if (this.taskId) {
-                this.close();
-            }
-
-            // Запускаем обработку
-            const response = await fetch("/process_images", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ path: currentPath })
-            });
-
-            const { success, task_id, error } = await response.json();
-            
-            if (!success) {
-                throw new Error(error || "Ошибка запуска обработки");
-            }
-
-            this.taskId = task_id;
-            this.show();
-            this.connect();
-        } catch (error) {
-            console.error("Ошибка запуска обработки:", error);
-        }
-    },
-
     connect() {
         if (!this.taskId) return;
 
@@ -175,12 +132,6 @@ const progressBar = {
             btn.style.opacity = "0.5";
             btn.style.cursor = "not-allowed";
         });
-
-        // Блокируем кнопку закрытия сайдбара (опционально, можно оставить работающей)
-        // if (DOM.menuToggle) {
-        //     DOM.menuToggle.disabled = true;
-        //     DOM.menuToggle.style.opacity = "0.5";
-        // }
     },
 
     unblockNavigation() {
@@ -222,12 +173,6 @@ const progressBar = {
             btn.style.opacity = "";
             btn.style.cursor = "";
         });
-
-        // Разблокируем кнопку закрытия сайдбара
-        // if (DOM.menuToggle) {
-        //     DOM.menuToggle.disabled = false;
-        //     DOM.menuToggle.style.opacity = "";
-        // }
     },
 
     disconnect() {

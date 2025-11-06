@@ -4,7 +4,7 @@
 import os
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from metadata import load_metadata
 from PIL import Image, UnidentifiedImageError
 from paths import get_thumbnail_path, get_absolute_path, get_relative_path, walk_images, get_metadata_path
@@ -69,19 +69,46 @@ def needs_processing(folder=None):
     """
     Проверяет, нужна ли обработка изображений в указанной папке.
     Возвращает True если есть изображения без миниатюр, метаданных или с устаревшими миниатюрами.
+    Использует параллельную проверку для больших папок для ускорения.
     """
     image_paths = _get_image_paths(folder)
     
     if not image_paths:
         return False
     
-    for image_path in image_paths:
+    # Для небольших папок проверяем последовательно (быстрее из-за отсутствия overhead)
+    if len(image_paths) < 50:
+        for image_path in image_paths:
+            try:
+                mtime = os.path.getmtime(image_path)
+                thumb_path = get_thumbnail_path(image_path)
+                meta_path = get_metadata_path(image_path)
+                
+                # Проверяем миниатюру (используем уже полученный mtime)
+                try:
+                    thumb_mtime = os.path.getmtime(thumb_path) if os.path.exists(thumb_path) else 0
+                    if mtime > thumb_mtime:
+                        return True
+                except OSError:
+                    return True
+                
+                # Проверяем метаданные
+                if not os.path.exists(meta_path):
+                    return True
+            except Exception as e:
+                logger.warning(f"Ошибка проверки изображения {image_path}: {e}")
+                return True
+        
+        return False
+    
+    # Для больших папок используем параллельную проверку
+    def check_single_image(image_path):
         try:
             mtime = os.path.getmtime(image_path)
             thumb_path = get_thumbnail_path(image_path)
             meta_path = get_metadata_path(image_path)
             
-            # Проверяем миниатюру (используем уже полученный mtime)
+            # Проверяем миниатюру
             try:
                 thumb_mtime = os.path.getmtime(thumb_path) if os.path.exists(thumb_path) else 0
                 if mtime > thumb_mtime:
@@ -92,9 +119,24 @@ def needs_processing(folder=None):
             # Проверяем метаданные
             if not os.path.exists(meta_path):
                 return True
+            
+            return False
         except Exception as e:
             logger.warning(f"Ошибка проверки изображения {image_path}: {e}")
             return True
+    
+    # Используем параллельную проверку с ограничением воркеров
+    # Прерываем проверку как только найдем первый файл, требующий обработки
+    max_workers = min(16, (os.cpu_count() or 1) * 2, len(image_paths))
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(check_single_image, path): path for path in image_paths}
+        for future in as_completed(futures):
+            if future.result():
+                # Отменяем оставшиеся задачи для ускорения
+                for remaining_future in futures:
+                    if remaining_future != future and not remaining_future.done():
+                        remaining_future.cancel()
+                return True
     
     return False
 
@@ -110,20 +152,47 @@ def collect_images(folder=None, progress_callback=None):
     if progress_callback:
         progress_callback(0, total, f"Найдено {total} изображений")
     
-    results = []
+    if total == 0:
+        return []
+    
+    results = [None] * total  # Предварительно создаем список для сохранения порядка
     processed = 0
     
     # Используем ThreadPoolExecutor для параллельной обработки
+    # Используем as_completed для обработки результатов по мере готовности
+    # Это позволяет обновлять прогресс сразу, как только первая задача завершится
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = [pool.submit(process_image, path) for path in image_paths]
-        for future in futures:
-            result = future.result()
-            results.append(result)
-            processed += 1
-            if progress_callback:
-                progress_callback(processed, total, f"Обработка {processed}/{total}")
+        # Отправляем все задачи в пул с сохранением индекса
+        # pool.submit() очень быстрая операция, просто добавляет задачу в очередь
+        futures = {}
+        for idx, path in enumerate(image_paths):
+            future = pool.submit(process_image, path)
+            futures[future] = idx
+        
+        # Обрабатываем результаты по мере их готовности
+        # as_completed возвращает futures по мере завершения задач, а не последовательно
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                result = future.result()
+                results[idx] = result
+                processed += 1
+                if progress_callback:
+                    progress_callback(processed, total, f"Обработка {processed}/{total}")
+            except Exception as e:
+                logger.error(f"Ошибка обработки изображения {image_paths[idx]}: {e}")
+                # Добавляем пустой результат для сохранения порядка
+                results[idx] = {
+                    "filename": get_relative_path(image_paths[idx]),
+                    "thumbnail": "",
+                    "metadata": {}
+                }
+                processed += 1
+                if progress_callback:
+                    progress_callback(processed, total, f"Обработка {processed}/{total} (ошибка)")
     
-    return results
+    # Фильтруем None значения (на случай если что-то пошло не так)
+    return [r for r in results if r is not None]
 
 def sort_images(images, sort_by, order):
     reverse = (order == "desc")

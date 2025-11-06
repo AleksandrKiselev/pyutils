@@ -959,7 +959,7 @@ body.sidebar-visible .sidebar {
 
 .fullscreen-tags-overlay {
     position: absolute;
-    bottom: var(--spacing-lg);
+    bottom: var(--spacing-xl);
     left: 50%;
     transform: translateX(-50%);
     width: calc(100% - var(--spacing-lg) * 2);

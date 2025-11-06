@@ -10,16 +10,11 @@ window.prevImage = fullscreen.prev;
 window.nextImage = fullscreen.next;
 window.deleteFullscreen = fullscreen.delete;
 window.copyPromptFullscreen = fullscreen.copyPrompt;
-window.copyToClipboard = clipboard.copy;
-window.copyToFavorites = favorites.copy;
 window.copyToFavoritesFullscreen = favorites.copyFromFullscreen;
 window.deleteThumbnail = gallery.deleteThumbnail;
 window.setRating = rating.set;
 window.showStars = rating.showStars;
 window.hideStars = rating.hideStars;
-
-// Экспортируем функцию прогресс-бара для ручного запуска
-window.startProgress = progressBar.start.bind(progressBar);
 
 window.onload = function () {
     document.body.classList.add("no-transition");

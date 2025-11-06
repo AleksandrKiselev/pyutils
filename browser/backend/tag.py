@@ -2,14 +2,11 @@
 Извлечение, нормализация и управление тегами.
 """
 import os
-import json
 import logging
-import difflib
 import re
 import unicodedata
-from functools import lru_cache
-from typing import Set, List, Dict, Any
-from paths import walk_metadata
+from typing import Set, Dict, Any
+from rapidfuzz import fuzz
 from config import config
 from PIL import Image
 
@@ -58,7 +55,7 @@ def add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], threshold: f
         if tag in prompt:
             return True
         for token in tokens:
-            if difflib.SequenceMatcher(None, token, tag).ratio() >= threshold:
+            if fuzz.ratio(token, tag) / 100.0 >= threshold:
                 return True
         return False
 
