@@ -18,13 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 def _get_filtered_images(folder_path: Optional[str], search: str):
-    """Вспомогательная функция для получения отфильтрованных изображений."""
     images = collect_images(None if folder_path is None else folder_path)
     return filter_images(images, search)
 
 
 def _clear_metadata_cache():
-    """Очищает кэш метаданных и тегов."""
     load_metadata.cache_clear()
 
 
@@ -55,7 +53,6 @@ class ImageService:
 class MetadataService:
     @staticmethod
     def update_metadata(filenames: List[str], updates: Dict) -> None:
-        # Обрабатываем файлы последовательно для безопасности операций с метаданными
         for filename in filenames:
             image_path = get_absolute_path(filename)
             if not os.path.exists(image_path):
@@ -79,7 +76,6 @@ class MetadataService:
     def uncheck_all(folder_path: Optional[str], search: str) -> int:
         images = _get_filtered_images(folder_path, search)
         
-        # Используем параллельную обработку для больших коллекций
         def process_single(img):
             image_path = get_absolute_path(img["filename"])
             if not os.path.exists(image_path):
@@ -96,7 +92,6 @@ class MetadataService:
                 logger.warning(f"Не удалось снять отметку с {img['filename']}: {e}")
             return 0
         
-        # Для небольших коллекций обрабатываем последовательно, для больших - параллельно
         if len(images) < 100:
             count = sum(process_single(img) for img in images)
         else:
@@ -110,10 +105,8 @@ class MetadataService:
     
     @staticmethod
     def delete_metadata(folder_path: Optional[str], search: str) -> int:
-        """Удаляет файлы метаданных для всех изображений в указанной папке или фильтрах."""
         images = _get_filtered_images(folder_path, search)
         
-        # Используем параллельную обработку для больших коллекций
         def process_single(img):
             image_path = get_absolute_path(img["filename"])
             if not os.path.exists(image_path):
@@ -128,7 +121,6 @@ class MetadataService:
                 logger.warning(f"Не удалось удалить метаданные для {img['filename']}: {e}")
             return 0
         
-        # Для небольших коллекций обрабатываем последовательно, для больших - параллельно
         if len(images) < 100:
             count = sum(process_single(img) for img in images)
         else:

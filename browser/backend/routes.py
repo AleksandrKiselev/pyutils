@@ -27,7 +27,6 @@ routes = Blueprint("routes", __name__)
 
 
 def _get_validated_folder_path(subpath: str):
-    """Валидирует и возвращает абсолютный путь к папке."""
     if subpath:
         subpath = unquote(subpath)
     
@@ -110,7 +109,6 @@ def serve_file(filename: str):
         if not os.path.exists(path):
             raise PathNotFoundError("Файл не найден")
         
-        # Дополнительная проверка безопасности: убеждаемся, что путь внутри IMAGE_FOLDER
         if not os.path.abspath(path).startswith(os.path.abspath(config.IMAGE_FOLDER)):
             raise PathNotFoundError("Доступ к файлу запрещен")
         
@@ -179,7 +177,6 @@ def copy_to_favorites():
 
 
 def _get_validated_path_and_search(data):
-    """Валидирует путь и поисковый запрос из данных запроса."""
     subpath = data.get("path", "")
     raw_search = data.get("search", "")
     
@@ -225,7 +222,6 @@ def delete_metadata():
 
 @routes.route("/check_processing_needed", methods=["POST"])
 def check_processing_needed():
-    """Проверяет, нужна ли обработка изображений для указанной папки."""
     try:
         data = validate_json_request(request)
         folder_path = _get_validated_folder_path(data.get("path", ""))
@@ -240,7 +236,6 @@ def check_processing_needed():
 
 @routes.route("/progress/<task_id>")
 def progress_stream(task_id: str):
-    """SSE эндпоинт для получения прогресса обработки изображений."""
     import json
     import time
     
@@ -278,7 +273,6 @@ def progress_stream(task_id: str):
 
 @routes.route("/process_images", methods=["POST"])
 def process_images():
-    """Запускает обработку изображений в фоновом режиме и возвращает task_id."""
     try:
         data = validate_json_request(request)
         folder_path = _get_validated_folder_path(data.get("path", ""))

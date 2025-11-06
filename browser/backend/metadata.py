@@ -21,7 +21,7 @@ def extract_prompt_from_png(image_path: str) -> str:
         with open(image_path, "rb") as f:
             data = f.read()
 
-        chunks: list = []
+        chunks = []
         offset = 8
         
         while offset < len(data):
@@ -63,7 +63,6 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
     metadata: Dict[str, Any] = {}
     modified = False
 
-    # Быстрая проверка существования файла
     try:
         if os.path.exists(path):
             try:
@@ -107,7 +106,6 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
 def save_metadata(image_path: str, metadata: Dict[str, Any]) -> None:
     path = get_metadata_path(image_path)
     try:
-        # Директория уже создается в get_metadata_file_path, но оставляем для надежности
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=4)

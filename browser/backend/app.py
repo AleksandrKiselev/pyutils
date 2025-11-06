@@ -18,7 +18,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Определяем абсолютные пути к static и templates относительно browser/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 app = Flask(__name__, static_folder=os.path.join(BASE_DIR, "static"), template_folder=os.path.join(BASE_DIR, "templates"))
 app.register_blueprint(routes)
@@ -26,7 +25,6 @@ app.config.update(load_config())
 
 
 def open_browser() -> None:
-    """Открывает браузер."""
     time.sleep(1)
     try:
         webbrowser.open("http://127.0.0.1:5000")
