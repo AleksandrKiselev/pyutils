@@ -17,22 +17,24 @@
             <div class="search-sort-bar">
                 <div class="search-sort-center">
                     <div class="search-container">
-                        <input type="text" id="search-box" placeholder="prompt | t:tag1,… | g: | g:t:" oninput="filterImages()">
+                        <input type="text" id="search-box" placeholder="prompt |t: | d: | g: | g:t: | g:d:" oninput="filterImages()">
                     </div>
                     <div class="sort-container">
                         <select id="sort-select" onchange="changeSort()">
-                            <option value="date-asc">📅Старые → Новые</option>
-                            <option value="date-desc" selected>📅Новые → Старые</option>
+                            <option value="date-asc">📅Старый → Новый</option>
+                            <option value="date-desc" selected>📅Новый → Старый</option>
                             <option value="filename-asc">📝Имя А → Я</option>
                             <option value="filename-desc">📝Имя Я → А</option>
                             <option value="prompt-asc">💬Промпт А → Я</option>
                             <option value="prompt-desc">💬Промпт Я → А</option>
                             <option value="rating-asc">⭐Рейтинг 1 → 5</option>
                             <option value="rating-desc">⭐Рейтинг 5 → 1</option>
-                            <option value="tags-asc">🏷️Теги А → Я</option>
-                            <option value="tags-desc">🏷️Теги Я → А</option>
-                            <option value="size-asc">📦Размер Малый → Большой</option>
-                            <option value="size-desc">📦Размер Большой → Малый</option>
+                            <option value="tags-asc">🏷️Тег А → Я</option>
+                            <option value="tags-desc">🏷️Тег Я → А</option>
+                            <option value="size-asc">📦Малый → Большой</option>
+                            <option value="size-desc">📦Большой → Малый</option>
+                            <option value="hash-asc">🔐Хеш А → Я</option>
+                            <option value="hash-desc">🔐Хеш Я → А</option>
                         </select>
                     </div>
                     <div class="reset-and-folder">

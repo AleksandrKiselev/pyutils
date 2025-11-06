@@ -292,7 +292,7 @@ body.sidebar-visible .sidebar {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: var(--sidebar-padding-y) var(--offset-xs) var(--sidebar-padding-y) var(--sidebar-padding-x);
+    padding: var(--sidebar-padding-y) var(--offset-xs) var(--spacing-xl) var(--sidebar-padding-x);
 }
 
 .sidebar::-webkit-scrollbar {
@@ -313,7 +313,8 @@ body.sidebar-visible .sidebar {
     flex: 1 1 auto;
     overflow-y: auto;
     min-height: 0;
-    padding-bottom: var(--spacing-sm);
+    padding-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-sm);
 }
 
 .sidebar-folders-bottom-spacer {

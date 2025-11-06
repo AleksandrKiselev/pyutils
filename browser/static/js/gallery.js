@@ -40,6 +40,13 @@ const gallery = {
 
         const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
         
+        // Определяем, является ли поиск глобальным
+        const isGlobalSearch = state.searchQuery && state.searchQuery.trim().toLowerCase().startsWith("g:");
+        
+        // Если глобальный поиск, проверяем все папки (пустая строка означает корневую папку)
+        // Если локальный поиск, проверяем только текущую папку
+        const pathToCheck = isGlobalSearch ? "" : currentPath;
+        
         try {
             // Закрываем предыдущий прогресс-бар если он был активен
             if (progressBar.taskId) {
@@ -58,7 +65,7 @@ const gallery = {
                     fetch("/check_processing_needed", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ path: currentPath })
+                        body: JSON.stringify({ path: pathToCheck })
                     }),
                     timeoutPromise
                 ]);
@@ -81,7 +88,7 @@ const gallery = {
             const response = await fetch("/process_images", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ path: currentPath })
+                body: JSON.stringify({ path: pathToCheck })
             });
 
             const { success, task_id, error } = await response.json();
@@ -246,24 +253,26 @@ const gallery = {
             
             await gallery.load();
             
-            // Восстанавливаем фокус и позицию курсора после загрузки
-            // Всегда восстанавливаем фокус, если поле было в фокусе до загрузки
+            // Восстанавливаем фокус и позицию курсора после загрузки только если поле все еще существует
             if (hadFocus && cursorPosition !== null && DOM.searchBox && document.body.contains(DOM.searchBox)) {
-                // Используем requestAnimationFrame для восстановления фокуса после обновления DOM
-                requestAnimationFrame(() => {
+                // Проверяем, что значение не изменилось пользователем во время загрузки
+                const currentValue = DOM.searchBox.value;
+                if (currentValue === searchValue || currentValue.startsWith(searchValue)) {
+                    // Используем один requestAnimationFrame для плавного восстановления
                     requestAnimationFrame(() => {
                         if (DOM.searchBox && document.body.contains(DOM.searchBox)) {
-                            // Восстанавливаем значение, если оно было изменено stateManager.restore()
-                            // или другими операциями во время загрузки
-                            if (DOM.searchBox.value !== searchValue) {
+                            // Восстанавливаем значение только если оно было изменено системой
+                            if (DOM.searchBox.value !== searchValue && DOM.searchBox.value !== currentValue) {
                                 DOM.searchBox.value = searchValue;
                             }
-                            DOM.searchBox.focus();
-                            const finalCursorPosition = Math.min(cursorPosition, DOM.searchBox.value.length);
-                            DOM.searchBox.setSelectionRange(finalCursorPosition, finalCursorPosition);
+                            // Восстанавливаем позицию курсора только если поле все еще в фокусе
+                            if (document.activeElement === DOM.searchBox) {
+                                const finalCursorPosition = Math.min(cursorPosition, DOM.searchBox.value.length);
+                                DOM.searchBox.setSelectionRange(finalCursorPosition, finalCursorPosition);
+                            }
                         }
                     });
-                });
+                }
             }
         }, 300);
     },

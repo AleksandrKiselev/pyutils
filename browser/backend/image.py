@@ -2,6 +2,7 @@
 Утилиты обработки изображений: сортировка, фильтрация и сбор.
 """
 import os
+import hashlib
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
@@ -13,14 +14,30 @@ from config import config
 logger = logging.getLogger(__name__)
 
 
-lru_cache(maxsize=4096)
+@lru_cache(maxsize=4096)
+def _calculate_file_hash(image_path: str, mtime: float) -> str:
+    """Вычисляет MD5 хеш файла. Кэшируется по пути и времени модификации."""
+    try:
+        hash_md5 = hashlib.md5()
+        with open(image_path, "rb") as f:
+            # Читаем файл блоками для экономии памяти
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+        return hash_md5.hexdigest()
+    except Exception as e:
+        logger.warning(f"Ошибка вычисления хеша для {image_path}: {e}")
+        return ""
+
+@lru_cache(maxsize=4096)
 def get_image(image_path, mtime: float):
+    file_hash = _calculate_file_hash(image_path, mtime)
     return {
         "filename": get_relative_path(image_path),
         "thumbnail": load_thumbnail(image_path),
         "metadata": load_metadata(image_path),
         "size": os.path.getsize(image_path),
-        "mtime": mtime
+        "mtime": mtime,
+        "hash": file_hash
     }
 
 
@@ -82,7 +99,8 @@ def collect_images(folder=None, progress_callback=None):
                     "filename": get_relative_path(image_paths[idx]),
                     "thumbnail": "",
                     "metadata": {},
-                    "size": 0
+                    "size": 0,
+                    "hash": ""
                 }
                 processed += 1
                 if progress_callback:
@@ -110,7 +128,8 @@ def sort_images(images, sort_by, order):
         "prompt": lambda img: img["metadata"].get("prompt", "").lower(),
         "rating": lambda img: img["metadata"].get("rating", 0),
         "tags": lambda img: ", ".join(img["metadata"].get("tags", [])).lower(),
-        "size": lambda img: img.get("size", 0)
+        "size": lambda img: img.get("size", 0),
+        "hash": lambda img: img.get("hash", "")
     }
     if sort_by in key_funcs:
         images.sort(key=key_funcs[sort_by], reverse=reverse)
@@ -137,5 +156,21 @@ def filter_images(images, search):
                     return False
             return True
         return [img for img in images if match(img["metadata"].get("tags", []))]
+    elif search.startswith(("duplicates:", "duplicate:", "d:")):
+        # Фильтрация по дубликатам: показываем только изображения с одинаковым содержимым (хеш)
+        from collections import Counter
+        
+        # Собираем хеши файлов
+        hash_counts = Counter()
+        for img in images:
+            file_hash = img.get("hash", "")
+            if file_hash:  # Пропускаем файлы без хеша
+                hash_counts[file_hash] += 1
+        
+        # Возвращаем только те изображения, у которых хеш встречается более одного раза
+        return [
+            img for img in images 
+            if img.get("hash") and hash_counts[img.get("hash", "")] > 1
+        ]
     else:
         return [img for img in images if search in img["metadata"].get("prompt", "").lower()]
