@@ -7,7 +7,6 @@ import re
 import struct
 import zlib
 import logging
-from functools import lru_cache
 from typing import Dict, Any
 from paths import get_metadata_path
 from tag import add_tags_from_prompt
@@ -16,7 +15,7 @@ from exceptions import FileOperationError
 logger = logging.getLogger(__name__)
 
 
-def extract_prompt_from_png(image_path: str) -> str:
+def extract_prompt_from_image(image_path: str) -> str:
     try:
         with open(image_path, "rb") as f:
             data = f.read()
@@ -57,8 +56,7 @@ def extract_prompt_from_png(image_path: str) -> str:
         return "Метаданные не найдены"
 
 
-@lru_cache(maxsize=512)
-def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
+def load_metadata(image_path: str) -> Dict[str, Any]:
     path = get_metadata_path(image_path)
     metadata = {}
     modified = False
@@ -79,7 +77,7 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
         metadata = {}
 
     if "prompt" not in metadata:
-        metadata["prompt"] = extract_prompt_from_png(image_path)
+        metadata["prompt"] = extract_prompt_from_image(image_path)
         modified = True
     if "checked" not in metadata:
         metadata["checked"] = False

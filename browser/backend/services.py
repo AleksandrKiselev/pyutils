@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from exceptions import FileOperationError, InvalidRequestError
 from paths import get_absolute_path, get_metadata_path, get_thumbnail_path
 from metadata import load_metadata, save_metadata
-from image import collect_images, filter_images, sort_images
+from image import collect_images, filter_images, sort_images, get_image
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -22,8 +22,8 @@ def _get_filtered_images(folder_path: Optional[str], search: str):
     return filter_images(images, search)
 
 
-def _clear_metadata_cache():
-    load_metadata.cache_clear()
+def clear_caches():
+    get_image.cache_clear()
 
 
 class ImageService:
@@ -70,7 +70,7 @@ class MetadataService:
             except Exception as e:
                 raise FileOperationError(f"Не удалось обновить метаданные для {filename}: {e}")
         
-        _clear_metadata_cache()
+        clear_caches()
     
     @staticmethod
     def uncheck_all(folder_path: Optional[str], search: str) -> int:
@@ -100,7 +100,7 @@ class MetadataService:
                 results = list(pool.map(process_single, images))
                 count = sum(results)
         
-        _clear_metadata_cache()
+        clear_caches()
         return count
     
     @staticmethod
@@ -129,7 +129,7 @@ class MetadataService:
                 results = list(pool.map(process_single, images))
                 count = sum(results)
         
-        _clear_metadata_cache()
+        clear_caches()
         return count
 
 

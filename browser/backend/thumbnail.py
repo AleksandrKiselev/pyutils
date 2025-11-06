@@ -47,7 +47,7 @@ def needs_thumbnail(image_path: str) -> bool:
         return True
 
 
-def process_thumbnail(image_path: str) -> str:
+def load_thumbnail(image_path: str) -> str:
     thumb_path = get_thumbnail_path(image_path)
     
     if needs_thumbnail(image_path):

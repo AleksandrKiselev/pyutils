@@ -32,7 +32,7 @@ def validate_sort_params(request: Request) -> Tuple[str, str]:
     sort_by = request.args.get("sort_by", "date")
     order = request.args.get("order", "asc")
     
-    valid_sort_fields = {"date", "filename", "prompt", "rating", "tags"}
+    valid_sort_fields = {"date", "filename", "prompt", "rating", "tags", "size"}
     valid_orders = {"asc", "desc"}
     
     if sort_by not in valid_sort_fields:

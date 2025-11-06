@@ -53,6 +53,26 @@ def get_thumbnail_path(image_path: str) -> str:
     return get_metadata_file_path(image_path, ".webp")
 
 
+def get_image_paths(folder=None):
+    if folder:
+        if not os.path.isdir(folder):
+            logger.warning(f"Указанный путь не является директорией: {folder}")
+            return []
+        paths = []
+        try:
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    if entry.is_file():
+                        ext = os.path.splitext(entry.name)[1].lower()
+                        if ext in config.ALLOWED_EXTENSIONS:
+                            paths.append(entry.path)
+        except OSError as e:
+            logger.warning(f"Ошибка чтения директории {folder}: {e}")
+        return paths
+    else:
+        return list(walk_images())
+
+
 def get_absolute_path(relative_path: str, root_folder: Optional[str] = None) -> str:
     if root_folder is None:
         root_folder = config.IMAGE_FOLDER
