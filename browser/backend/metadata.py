@@ -53,14 +53,14 @@ def extract_prompt_from_png(image_path: str) -> str:
         logger.error(f"Ошибка чтения файла {image_path}: {e}")
         return "Метаданные не найдены"
     except Exception as e:
-        logger.error(f"Неожиданная ошибка извлечения промпта из {image_path}: {e}")
+        logger.error(f"Ошибка получения промпта из {image_path}: {e}")
         return "Метаданные не найдены"
 
 
 @lru_cache(maxsize=512)
 def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
     path = get_metadata_path(image_path)
-    metadata: Dict[str, Any] = {}
+    metadata = {}
     modified = False
 
     try:
@@ -76,6 +76,7 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
                 metadata = {}
     except Exception as e:
         logger.warning(f"Ошибка проверки метаданных для {image_path}: {e}")
+        metadata = {}
 
     if "prompt" not in metadata:
         metadata["prompt"] = extract_prompt_from_png(image_path)
@@ -95,11 +96,7 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
         modified = True
 
     if modified:
-        try:
-            save_metadata(image_path, metadata)
-        except FileOperationError:
-            pass
-
+        save_metadata(image_path, metadata)
     return metadata
 
 

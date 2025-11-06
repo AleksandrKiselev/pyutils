@@ -16,11 +16,13 @@ def process_image(image_path):
     mtime = os.path.getmtime(image_path)
     metadata = load_metadata(image_path, mtime)
     thumbnail = process_thumbnail(image_path)
+    file_size = os.path.getsize(image_path)
     
     return {
         "filename": get_relative_path(image_path),
         "thumbnail": thumbnail,
-        "metadata": metadata
+        "metadata": metadata,
+        "size": file_size
     }
 
 def _get_image_paths(folder=None):
@@ -51,45 +53,18 @@ def needs_processing(folder=None):
     if not image_paths:
         return False
     
-    if len(image_paths) < 50:
-        for image_path in image_paths:
-            try:
-                if needs_thumbnail(image_path):
-                    return True
-                
-                meta_path = get_metadata_path(image_path)
-                if not os.path.exists(meta_path):
-                    return True
-            except Exception as e:
-                logger.warning(f"Ошибка проверки изображения {image_path}: {e}")
-                return True
-        
-        return False
-    
-    def check_single_image(image_path):
+    for image_path in image_paths:
         try:
             if needs_thumbnail(image_path):
                 return True
-            
+
             meta_path = get_metadata_path(image_path)
             if not os.path.exists(meta_path):
                 return True
-            
-            return False
         except Exception as e:
             logger.warning(f"Ошибка проверки изображения {image_path}: {e}")
             return True
-    
-    max_workers = min(16, (os.cpu_count() or 1) * 2, len(image_paths))
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(check_single_image, path): path for path in image_paths}
-        for future in as_completed(futures):
-            if future.result():
-                for remaining_future in futures:
-                    if remaining_future != future and not remaining_future.done():
-                        remaining_future.cancel()
-                return True
-    
+
     return False
 
 
@@ -127,7 +102,8 @@ def collect_images(folder=None, progress_callback=None):
                 results[idx] = {
                     "filename": get_relative_path(image_paths[idx]),
                     "thumbnail": "",
-                    "metadata": {}
+                    "metadata": {},
+                    "size": 0
                 }
                 processed += 1
                 if progress_callback:

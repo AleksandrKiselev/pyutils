@@ -43,23 +43,26 @@ def extract_seed(image_path: str) -> str:
 
 
 def add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], threshold: float = 0.9) -> None:
-    all_tags = [normalize(tag.lower()) for tag in config.AUTO_TAGS]
     prompt = metadata.get("prompt", "").lower()
-    tokens = [
-        normalize(token.lower())
-        for token in re.split(r"[.,:]|\bBREAK\b", prompt, flags=re.IGNORECASE)
-        if token.strip()
-    ]
+    prompt_tags = list()
+    if prompt:
+        all_tags = [normalize(tag.lower()) for tag in config.AUTO_TAGS]
+        tokens = [
+            normalize(token.lower())
+            for token in re.split(r"[.,:]|\bBREAK\b", prompt, flags=re.IGNORECASE)
+            if token.strip()
+        ]
 
-    def check_tag(tag):
-        if tag in prompt:
-            return True
-        for token in tokens:
-            if fuzz.ratio(token, tag) / 100.0 >= threshold:
+        def check_tag(tag):
+            if tag in prompt:
                 return True
-        return False
+            for token in tokens:
+                if fuzz.ratio(token, tag) / 100.0 >= threshold:
+                    return True
+            return False
 
-    prompt_tags = {tag for tag in all_tags if check_tag(tag)}
+        prompt_tags = {tag for tag in all_tags if check_tag(tag)}
+
     image_tags = get_image_tags(image_path)
     image_tags.add(extract_seed(image_path))
     metadata["tags"] = sorted(prompt_tags) + list(image_tags)

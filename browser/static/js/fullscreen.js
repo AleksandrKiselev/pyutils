@@ -18,6 +18,15 @@ const fullscreen = {
         DOM.fullscreenPrompt.dataset.prompt = data.metadata.prompt;
         DOM.fullscreenPrompt.textContent = data.metadata.prompt || "";
 
+        const filenameOnly = data.filename ? data.filename.split(/[/\\]/).pop() : "";
+        const fileSize = data.size || 0;
+        const fileSizeFormatted = fileSize >= 1024 * 1024 
+            ? (fileSize / (1024 * 1024)).toFixed(2) + " MB"
+            : fileSize >= 1024
+            ? (fileSize / 1024).toFixed(2) + " KB"
+            : fileSize + " B";
+        DOM.fullscreenFilename.innerHTML = `${filenameOnly} <span class="file-size">${fileSizeFormatted}</span>`;
+
         const miniCheckbox = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`);
         const isChecked = miniCheckbox ? miniCheckbox.checked : !!data.metadata.checked;
 

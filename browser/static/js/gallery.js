@@ -173,6 +173,14 @@ const gallery = {
             const prompt = utils.escapeJS(img.metadata.prompt || "");
             const filenameEscaped = utils.escapeJS(img.filename || "");
             const filenameAttrEscaped = img.filename ? img.filename.replace(/"/g, "&quot;").replace(/'/g, "&#39;") : "";
+            const filenameOnly = img.filename ? img.filename.split(/[/\\]/).pop() : "";
+            const filenameOnlyEscaped = utils.escapeJS(filenameOnly);
+            const fileSize = img.size || 0;
+            const fileSizeFormatted = fileSize >= 1024 * 1024 
+                ? (fileSize / (1024 * 1024)).toFixed(2) + " MB"
+                : fileSize >= 1024
+                ? (fileSize / 1024).toFixed(2) + " KB"
+                : fileSize + " B";
             const ratingValue = img.metadata.rating || 0;
 
             const tags = img.metadata.tags || [];
@@ -206,6 +214,7 @@ const gallery = {
                     <img src="/serve_thumbnail/${img.thumbnail}" alt="Image" loading="lazy"
                          onload="this.parentElement.classList.add('image-loaded')"
                          onmouseenter="gallery.setHoveredPrompt('${prompt}')">
+                    <div class="image-filename">${filenameOnlyEscaped} <span class="file-size">${fileSizeFormatted}</span></div>
                 </div>`;
         }).join("");
     },

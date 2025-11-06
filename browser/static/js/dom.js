@@ -13,6 +13,7 @@ const DOM = {
     fullscreenCheckbox: document.getElementById("fullscreen-checkbox"),
     fullscreenTagsDisplay: document.getElementById("fullscreen-tags-display"),
     fullscreenRating: document.getElementById("fullscreen-rating"),
+    fullscreenFilename: document.getElementById("fullscreen-filename"),
     toast: document.getElementById("toast"),
     progressContainer: document.getElementById("progress-container"),
     progressBar: document.getElementById("progress-bar"),

@@ -522,8 +522,19 @@ body.sidebar-visible .sidebar {
     width: 100%;
     margin: 0;
     padding: 0;
-    contain: layout;
     line-height: 0;
+}
+
+.image-container::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
+    pointer-events: none;
+    z-index: 1;
 }
 
 .image-container img {
@@ -553,6 +564,38 @@ body.sidebar-visible .sidebar {
     transition: filter var(--transition-slow);
 }
 
+
+/* ============================================================================
+   Image Filename (Thumbnail)
+   ============================================================================ */
+.image-filename {
+    position: absolute;
+    bottom: var(--spacing-sm);
+    left: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.95);
+    padding: 0;
+    pointer-events: none;
+    opacity: var(--opacity-idle);
+    transition: opacity var(--transition-base);
+    max-width: calc(100% - var(--spacing-md) * 2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    z-index: 2;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    line-height: 1.2;
+}
+
+.image-filename .file-size {
+    opacity: 0.7;
+    margin-left: var(--spacing-sm);
+}
+
+.image-container:hover .image-filename {
+    opacity: var(--opacity-full);
+}
 
 /* ============================================================================
    Image Buttons (Common Styles)
@@ -829,6 +872,18 @@ body.sidebar-visible .sidebar {
     max-height: 100%;
 }
 
+.fullscreen-image-wrapper::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 120px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
+    pointer-events: none;
+    z-index: var(--z-base);
+}
+
 
 .fullscreen-img img {
     max-width: 100vw;
@@ -950,6 +1005,38 @@ body.sidebar-visible .sidebar {
 /* Fullscreen stars use larger size */
 .fullscreen-rating .star {
     font-size: var(--star-size-fullscreen);
+}
+
+
+/* ============================================================================
+   Fullscreen Filename
+   ============================================================================ */
+.fullscreen-filename {
+    position: absolute;
+    bottom: var(--spacing-sm);
+    left: var(--spacing-xl);
+    font-size: var(--font-size-sm);
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.95);
+    padding: 0;
+    pointer-events: none;
+    opacity: var(--opacity-idle);
+    transition: opacity var(--transition-base);
+    z-index: calc(var(--z-fullscreen-controls) + 1);
+    max-width: calc(100% - var(--spacing-xl) * 2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.fullscreen-filename .file-size {
+    opacity: 0.7;
+    margin-left: var(--spacing-sm);
+}
+
+.fullscreen-image-wrapper:hover .fullscreen-filename {
+    opacity: var(--opacity-active);
 }
 
 
