@@ -33,7 +33,6 @@ const navigation = {
         } finally {
             DOM.loading.style.display = "none";
         }
-        tags.fetchAll();
     }
 };
 

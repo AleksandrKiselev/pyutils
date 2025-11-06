@@ -10,7 +10,6 @@ import threading
 
 from config import config
 from paths import build_folder_tree, get_absolute_path
-from tag import get_all_tags_cached
 from exceptions import PathNotFoundError, InvalidRequestError, FileOperationError
 from validators import (
     validate_search_query,
@@ -176,15 +175,6 @@ def copy_to_favorites():
         raise
     except Exception as e:
         logger.exception(f"Ошибка копирования в избранное: {e}")
-        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
-
-
-@routes.route("/all_tags")
-def get_all_tags():
-    try:
-        return jsonify(get_all_tags_cached())
-    except Exception as e:
-        logger.exception(f"Ошибка получения тегов: {e}")
         return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 

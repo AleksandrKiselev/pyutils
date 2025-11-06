@@ -5,7 +5,6 @@ const state = {
     currentIndex: 0,
     searchQuery: "",
     sortBy: "date-desc",
-    allTags: [],
     lastHoveredPrompt: null
 };
 

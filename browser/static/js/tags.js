@@ -1,13 +1,4 @@
 const tags = {
-    async fetchAll() {
-        try {
-            const res = await fetch("/all_tags");
-            state.allTags = await res.json();
-        } catch (err) {
-            console.error("Ошибка загрузки тегов:", err);
-        }
-    },
-
     renderPills(tags) {
         DOM.fullscreenTagsDisplay.innerHTML = "";
 
