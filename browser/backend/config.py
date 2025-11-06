@@ -48,7 +48,7 @@ def load_config() -> Config:
     loaded_config.ALLOWED_EXTENSIONS = set(loaded_config["allowed_extensions"])
     loaded_config.THUMBNAIL_SIZE = int(loaded_config["thumbnail_size"])
     loaded_config.ITEMS_PER_PAGE = int(loaded_config["items_per_page"])
-    loaded_config.TAGS = set(loaded_config.get("auto_tags", []))
+    loaded_config.AUTO_TAGS = set(loaded_config.get("auto_tags", []))
     
     return loaded_config
 

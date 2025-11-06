@@ -4,5 +4,3 @@ rapidfuzz>=3.0
 watchdog>=3.0
 python-dotenv>=1.0
 tqdm
-pytest>=7.0
-pytest-cov>=4.0
