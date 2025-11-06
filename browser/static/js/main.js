@@ -17,6 +17,9 @@ window.setRating = rating.set;
 window.showStars = rating.showStars;
 window.hideStars = rating.hideStars;
 
+// Экспортируем функцию прогресс-бара для ручного запуска
+window.startProgress = progressBar.start.bind(progressBar);
+
 window.onload = function () {
     document.body.classList.add("no-transition");
     

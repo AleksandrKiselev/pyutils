@@ -12,6 +12,12 @@ const gallery = {
         if (DOM.loading.style.display === "block") {
             DOM.loading.style.display = "none";
         }
+        
+        // Запускаем обработку изображений с прогресс-баром только если он не активен
+        if (progressBar && !progressBar.taskId) {
+            progressBar.start().catch(err => console.error("Ошибка запуска прогресс-бара:", err));
+        }
+        
         await gallery.loadMore();
     },
 

@@ -5,7 +5,8 @@ import os
 import logging
 from urllib.parse import unquote
 
-from flask import Blueprint, request, jsonify, render_template, send_from_directory
+from flask import Blueprint, request, jsonify, render_template, send_from_directory, Response
+import threading
 
 from config import config
 from paths import build_folder_tree, get_absolute_path
@@ -19,9 +20,23 @@ from validators import (
     validate_filename
 )
 from services import ImageService, MetadataService, FavoritesService
+from progress import create_progress_task, update_progress, complete_progress, error_progress, get_progress
+from image import collect_images, needs_processing
 
 logger = logging.getLogger(__name__)
 routes = Blueprint("routes", __name__)
+
+
+def _get_validated_folder_path(subpath: str):
+    """Валидирует и возвращает абсолютный путь к папке."""
+    if subpath:
+        subpath = unquote(subpath)
+    
+    folder_path = get_absolute_path(subpath) if subpath else None
+    if folder_path and not os.path.isdir(folder_path):
+        raise PathNotFoundError(f"Путь не существует: {folder_path}")
+    
+    return folder_path
 
 
 @routes.errorhandler(PathNotFoundError)
@@ -199,4 +214,87 @@ def uncheck_all():
         raise
     except Exception as e:
         logger.exception(f"Ошибка снятия отметок: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
+
+
+@routes.route("/check_processing_needed", methods=["POST"])
+def check_processing_needed():
+    """Проверяет, нужна ли обработка изображений для указанной папки."""
+    try:
+        data = validate_json_request(request)
+        folder_path = _get_validated_folder_path(data.get("path", ""))
+        
+        return jsonify({"needs_processing": needs_processing(folder=folder_path)})
+    except (PathNotFoundError, InvalidRequestError):
+        raise
+    except Exception as e:
+        logger.exception(f"Ошибка проверки необходимости обработки: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
+
+
+@routes.route("/progress/<task_id>")
+def progress_stream(task_id: str):
+    """SSE эндпоинт для получения прогресса обработки изображений."""
+    import json
+    import time
+    
+    def generate():
+        while True:
+            progress = get_progress(task_id)
+            if not progress:
+                yield f"data: {json.dumps({'error': 'Task not found'})}\n\n"
+                break
+            
+            percentage = (progress["processed"] / progress["total"] * 100) if progress["total"] > 0 else 0
+            progress_data = {
+                "processed": progress["processed"],
+                "total": progress["total"],
+                "status": progress["status"],
+                "message": progress["message"],
+                "percentage": percentage
+            }
+            
+            if progress.get("error"):
+                progress_data["error"] = progress["error"]
+            
+            yield f"data: {json.dumps(progress_data)}\n\n"
+            
+            if progress["status"] in ("completed", "error"):
+                break
+            
+            time.sleep(0.5)
+    
+    response = Response(generate(), mimetype="text/event-stream")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
+
+
+@routes.route("/process_images", methods=["POST"])
+def process_images():
+    """Запускает обработку изображений в фоновом режиме и возвращает task_id."""
+    try:
+        data = validate_json_request(request)
+        folder_path = _get_validated_folder_path(data.get("path", ""))
+        
+        task_id = create_progress_task()
+        
+        def process_task():
+            try:
+                def progress_callback(processed, total, message):
+                    update_progress(task_id, processed, total, message)
+                
+                collect_images(folder=folder_path, progress_callback=progress_callback)
+                complete_progress(task_id, "Обработка завершена")
+            except Exception as e:
+                logger.exception(f"Ошибка обработки изображений: {e}")
+                error_progress(task_id, str(e))
+        
+        threading.Thread(target=process_task, daemon=True).start()
+        
+        return jsonify({"success": True, "task_id": task_id})
+    except (PathNotFoundError, InvalidRequestError):
+        raise
+    except Exception as e:
+        logger.exception(f"Ошибка запуска обработки: {e}")
         return jsonify({"error": "Внутренняя ошибка сервера"}), 500

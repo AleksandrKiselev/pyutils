@@ -95,7 +95,7 @@ class FavoritesService:
     @staticmethod
     def copy_to_favorites(filename: str) -> None:
         src = get_absolute_path(filename)
-        dst_dir = config.get("favorites_folder")
+        dst_dir = config.FAVORITES_FOLDER
         
         if not dst_dir:
             raise InvalidRequestError("В конфиге не указана папка избранного")
@@ -109,7 +109,7 @@ class FavoritesService:
         try:
             shutil.copy2(src, dst)
             
-            src_meta = get_metadata_path(filename)
+            src_meta = get_metadata_path(src)
             dst_meta = get_metadata_path(dst)
             
             meta = {}

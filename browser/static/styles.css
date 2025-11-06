@@ -1084,6 +1084,91 @@ body.sidebar-visible .sidebar {
 }
 
 /* ============================================================================
+   Progress Bar
+   ============================================================================ */
+.progress-container {
+    position: fixed;
+    top: var(--spacing-xl);
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0.04) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    min-width: 400px;
+    max-width: 600px;
+    z-index: 2000;
+    box-shadow: 
+        0 4px 16px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    opacity: 1;
+    visibility: visible;
+    transition: opacity var(--transition-base), visibility var(--transition-base), transform var(--transition-base);
+}
+
+.progress-container.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-50%) translateY(-20px);
+    pointer-events: none;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.progress-header span {
+    color: var(--text-color);
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+}
+
+.progress-bar-wrapper {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-bottom: var(--spacing-md);
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-color) 0%, #ffb74d 100%);
+    border-radius: var(--radius-full);
+    transition: width 0.3s ease;
+    width: 0%;
+    box-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-color);
+    font-size: var(--font-size-base);
+    opacity: 0.9;
+}
+
+.progress-text {
+    font-weight: 500;
+}
+
+.progress-percentage {
+    font-weight: 600;
+    color: var(--accent-color);
+}
+
+/* ============================================================================
    Floating Menu Toggle Button (when sidebar is closed)
    ============================================================================ */
 .menu-toggle-floating {

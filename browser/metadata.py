@@ -63,16 +63,20 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
     metadata: Dict[str, Any] = {}
     modified = False
 
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                metadata = json.load(f)
-        except json.JSONDecodeError as e:
-            logger.warning(f"Поврежденный файл метаданных: {path}, ошибка: {e}")
-            metadata = {}
-        except IOError as e:
-            logger.warning(f"Ошибка чтения файла метаданных: {path}, ошибка: {e}")
-            metadata = {}
+    # Быстрая проверка существования файла
+    try:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    metadata = json.load(f)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Поврежденный файл метаданных: {path}, ошибка: {e}")
+                metadata = {}
+            except IOError as e:
+                logger.warning(f"Ошибка чтения файла метаданных: {path}, ошибка: {e}")
+                metadata = {}
+    except Exception as e:
+        logger.warning(f"Ошибка проверки метаданных для {image_path}: {e}")
 
     if "prompt" not in metadata:
         metadata["prompt"] = extract_prompt_from_png(image_path)
@@ -103,6 +107,7 @@ def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
 def save_metadata(image_path: str, metadata: Dict[str, Any]) -> None:
     path = get_metadata_path(image_path)
     try:
+        # Директория уже создается в get_metadata_file_path, но оставляем для надежности
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=4)

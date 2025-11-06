@@ -38,22 +38,74 @@ def process_image(image_path):
         "metadata": metadata
     }
 
-def collect_images(folder=None):
-    image_paths = []
+def _get_image_paths(folder=None):
+    """Возвращает список путей к изображениям в указанной папке."""
     if folder:
         paths = os.listdir(folder)
-        image_paths = [
+        return [
             os.path.join(folder, f) 
             for f in paths 
             if os.path.isfile(os.path.join(folder, f)) and 
                os.path.splitext(f)[1].lower() in config.ALLOWED_EXTENSIONS
         ]
     else:
-        image_paths = list(walk_images())
+        return list(walk_images())
+
+
+def needs_processing(folder=None):
+    """
+    Проверяет, нужна ли обработка изображений в указанной папке.
+    Возвращает True если есть изображения без миниатюр или с устаревшими миниатюрами.
+    """
+    image_paths = _get_image_paths(folder)
+    
+    if not image_paths:
+        return False
+    
+    for image_path in image_paths:
+        try:
+            mtime = os.path.getmtime(image_path)
+            thumb_path = get_thumbnail_path(image_path)
+            
+            if not os.path.exists(thumb_path) or mtime > os.path.getmtime(thumb_path):
+                return True
+        except Exception as e:
+            logger.warning(f"Ошибка проверки изображения {image_path}: {e}")
+            return True
+    
+    return False
+
+
+def collect_images(folder=None, progress_callback=None):
+    image_paths = _get_image_paths(folder)
+    
+    # Увеличиваем количество воркеров для I/O операций (для CPU-bound задач лучше меньше)
+    # Для обработки метаданных и создания миниатюр больше воркеров ускорит процесс
+    max_workers = min(32, (os.cpu_count() or 1) * 4, len(image_paths))
+    
+    total = len(image_paths)
+    if progress_callback:
+        progress_callback(0, total, f"Найдено {total} изображений")
+    
     results = []
-    with ThreadPoolExecutor(max_workers=10) as pool:
-        for result in tqdm(pool.map(process_image, image_paths), total=len(image_paths), desc="Обработка изображений"):
-            results.append(result)
+    processed = 0
+    
+    if progress_callback:
+        # Используем обычный map для возможности отслеживания прогресса
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(process_image, path) for path in image_paths]
+            for future in futures:
+                result = future.result()
+                results.append(result)
+                processed += 1
+                if progress_callback:
+                    progress_callback(processed, total, f"Обработка {processed}/{total}")
+    else:
+        # Старый способ с tqdm для консоли
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            for result in tqdm(pool.map(process_image, image_paths), total=len(image_paths), desc="Обработка изображений"):
+                results.append(result)
+    
     return results
 
 def sort_images(images, sort_by, order):
