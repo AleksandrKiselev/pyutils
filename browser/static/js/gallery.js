@@ -136,7 +136,10 @@ const gallery = {
             DOM.gallery.insertAdjacentHTML("beforeend", cardsHTML);
 
             gallery.loadCheckboxState();
-            images.forEach(img => rating.updateStars(null, img.filename, img.metadata.rating || 0));
+            images.forEach(img => {
+                const imagePath = img.metadata?.image_path || "";
+                rating.updateStars(null, imagePath, img.metadata?.rating || 0);
+            });
             state.offset += images.length;
 
             const containers = DOM.gallery.querySelectorAll(".image-container:not(.image-loaded)");
@@ -177,10 +180,14 @@ const gallery = {
             if (!img.metadata) {
                 img.metadata = {};
             }
+            // Все пути хранятся только в метаданных
+            const imagePath = img.metadata?.image_path || "";
+            const thumbnailPath = img.metadata?.thumbnail_path || "";
+            
             const prompt = utils.escapeJS(img.metadata.prompt || "");
-            const filenameEscaped = utils.escapeJS(img.filename || "");
-            const filenameAttrEscaped = img.filename ? img.filename.replace(/"/g, "&quot;").replace(/'/g, "&#39;") : "";
-            const filenameOnly = img.filename ? img.filename.split(/[/\\]/).pop() : "";
+            const filenameEscaped = utils.escapeJS(imagePath);
+            const filenameAttrEscaped = imagePath ? imagePath.replace(/"/g, "&quot;").replace(/'/g, "&#39;") : "";
+            const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
             const filenameOnlyEscaped = utils.escapeJS(filenameOnly);
             const fileSize = img.metadata.size || 0;
             const fileSizeFormatted = fileSize >= 1024 * 1024 
@@ -218,7 +225,7 @@ const gallery = {
                                 ${ratingValue >= star ? STARRED_SYMBOL : UNSTARRED_SYMBOL}
                             </span>`).join("")}
                     </div>
-                    <img src="/serve_thumbnail/${img.thumbnail}" alt="Image" loading="lazy"
+                    <img src="/serve_thumbnail/${thumbnailPath}" alt="Image" loading="lazy"
                          onload="this.parentElement.classList.add('image-loaded')"
                          onmouseenter="gallery.setHoveredPrompt('${prompt}')">
                     <div class="image-filename">${filenameOnlyEscaped} <span class="file-size">${fileSizeFormatted}</span></div>
@@ -305,8 +312,12 @@ const gallery = {
 
     loadCheckboxState() {
         document.querySelectorAll(".image-checkbox").forEach(cb => {
-            const img = state.currentImages.find(i => i.filename === cb.dataset.filename);
-            if (img) cb.checked = !!img.metadata.checked;
+            const filename = cb.dataset.filename;
+            const img = state.currentImages.find(i => {
+                const imagePath = i.metadata?.image_path || "";
+                return imagePath === filename;
+            });
+            if (img) cb.checked = !!img.metadata?.checked;
         });
         gallery.updateImageOpacity();
     },

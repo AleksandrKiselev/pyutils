@@ -13,12 +13,15 @@ const fullscreen = {
         const data = state.currentImages[state.currentIndex];
         if (!data) return;
 
-        DOM.fullscreenImg.src = `/serve_image/${data.filename}`;
+        // Все пути хранятся только в метаданных
+        const imagePath = data.metadata?.image_path || "";
+
+        DOM.fullscreenImg.src = `/serve_image/${imagePath}`;
 
         DOM.fullscreenPrompt.dataset.prompt = data.metadata.prompt;
         DOM.fullscreenPrompt.textContent = data.metadata.prompt || "";
 
-        const filenameOnly = data.filename ? data.filename.split(/[/\\]/).pop() : "";
+        const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
         const fileSize = data.metadata.size || 0;
         const fileSizeFormatted = fileSize >= 1024 * 1024 
             ? (fileSize / (1024 * 1024)).toFixed(2) + " MB"
@@ -27,10 +30,10 @@ const fullscreen = {
             : fileSize + " B";
         DOM.fullscreenFilename.innerHTML = `${filenameOnly} <span class="file-size">${fileSizeFormatted}</span>`;
 
-        const miniCheckbox = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`);
+        const miniCheckbox = document.querySelector(`.image-checkbox[data-filename="${imagePath}"]`);
         const isChecked = miniCheckbox ? miniCheckbox.checked : !!data.metadata.checked;
 
-        DOM.fullscreenCheckbox.dataset.filename = data.filename;
+        DOM.fullscreenCheckbox.dataset.filename = imagePath;
         DOM.fullscreenCheckbox.checked = isChecked;
 
         const wrapper = document.querySelector(".fullscreen-image-wrapper");
@@ -57,8 +60,9 @@ const fullscreen = {
                 }
             }
 
+            const imagePath = data.metadata?.image_path || "";
             utils.apiRequest("/update_metadata", {
-                body: JSON.stringify({ filename: data.filename, checked })
+                body: JSON.stringify({ filename: imagePath, checked })
             }).catch(console.error);
         };
     },
@@ -82,7 +86,11 @@ const fullscreen = {
 
                 data.metadata.rating = newRating;
 
-                const img = state.currentImages.find(i => i.filename === data.filename);
+                const imagePath = data.metadata?.image_path || "";
+                const img = state.currentImages.find(i => {
+                    const imgPath = i.metadata?.image_path || "";
+                    return imgPath === imagePath;
+                });
                 if (img) {
                     img.metadata.rating = newRating;
                 }
@@ -93,10 +101,10 @@ const fullscreen = {
                     s.classList.toggle("selected", r <= newRating);
                 });
 
-                rating.updateStars(null, data.filename, newRating);
+                rating.updateStars(null, imagePath, newRating);
 
                 utils.apiRequest("/update_metadata", {
-                    body: JSON.stringify({ filename: data.filename, rating: newRating })
+                    body: JSON.stringify({ filename: imagePath, rating: newRating })
                 }).catch(error => {
                     console.error("Ошибка сохранения рейтинга:", error);
                 });
@@ -124,13 +132,15 @@ const fullscreen = {
         const data = state.currentImages[state.currentIndex];
         if (!data || !confirm("Удалить изображение?")) return;
 
+        const imagePath = data.metadata?.image_path || "";
+
         try {
             const result = await utils.apiRequest("/delete_image", {
-                body: JSON.stringify({ filename: data.filename })
+                body: JSON.stringify({ filename: imagePath })
             });
 
             if (result.success) {
-                const thumb = document.querySelector(`.image-checkbox[data-filename="${data.filename}"]`)?.closest(".image-container");
+                const thumb = document.querySelector(`.image-checkbox[data-filename="${imagePath}"]`)?.closest(".image-container");
                 thumb?.remove();
 
                 state.currentImages.splice(state.currentIndex, 1);

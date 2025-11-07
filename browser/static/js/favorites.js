@@ -19,7 +19,8 @@ const favorites = {
     copyFromFullscreen() {
         const data = state.currentImages[state.currentIndex];
         if (!data) return;
-        favorites.copy({ stopPropagation: () => { } }, data.filename);
+        const imagePath = data.metadata?.image_path || "";
+        favorites.copy({ stopPropagation: () => { } }, imagePath);
     }
 };
 

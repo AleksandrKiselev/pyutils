@@ -4,14 +4,18 @@
 import os
 import time
 import logging
+from typing import Dict, Any
 from PIL import Image, UnidentifiedImageError
-from paths import get_thumbnail_path, get_relative_path
+from paths import get_absolute_paths
 from config import config
 
 logger = logging.getLogger(__name__)
 
 
-def create_thumbnail(image_path: str, thumb_path: str) -> bool:
+def create_thumbnail(metadata: Dict[str, Any]) -> bool:
+    """Создает миниатюру для изображения из метаданных."""
+    image_path, thumb_path, _ = get_absolute_paths(metadata)
+    
     for attempt in range(5):
         try:
             with Image.open(image_path) as img:
@@ -29,29 +33,17 @@ def create_thumbnail(image_path: str, thumb_path: str) -> bool:
     return False
 
 
-def needs_thumbnail(image_path: str) -> bool:
-    try:
-        mtime = os.path.getmtime(image_path)
-        thumb_path = get_thumbnail_path(image_path)
-        
-        if not os.path.exists(thumb_path):
-            return True
-        
-        try:
-            thumb_mtime = os.path.getmtime(thumb_path)
-            return mtime > thumb_mtime
-        except OSError:
-            return True
-    except OSError as e:
-        logger.warning(f"Ошибка проверки миниатюры для {image_path}: {e}")
+def needs_thumbnail(metadata: Dict[str, Any]) -> bool:
+    """Проверяет, нужна ли миниатюра."""
+    image_path, thumb_path, _ = get_absolute_paths(metadata)
+    
+    if not os.path.exists(thumb_path):
         return True
-
-
-def load_thumbnail(image_path: str) -> str:
-    thumb_path = get_thumbnail_path(image_path)
     
-    if needs_thumbnail(image_path):
-        create_thumbnail(image_path, thumb_path)
-    
-    return get_relative_path(thumb_path)
+    try:
+        image_mtime = os.path.getmtime(image_path)
+        thumb_mtime = os.path.getmtime(thumb_path)
+        return image_mtime > thumb_mtime
+    except OSError:
+        return True
 

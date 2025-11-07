@@ -2,11 +2,13 @@
 API маршруты для приложения просмотра изображений.
 """
 import os
+import json
+import time
 import logging
+import threading
 from urllib.parse import unquote
 
 from flask import Blueprint, request, jsonify, render_template, send_from_directory, Response
-import threading
 
 from config import config
 from paths import build_folder_tree, get_absolute_path
@@ -245,9 +247,6 @@ def check_processing_needed():
 
 @routes.route("/progress/<task_id>")
 def progress_stream(task_id: str):
-    import json
-    import time
-    
     def generate():
         while True:
             progress = get_progress(task_id)

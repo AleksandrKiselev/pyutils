@@ -5,44 +5,11 @@ import os
 import hashlib
 import logging
 from functools import lru_cache
-from typing import Dict, Any, Iterator, Optional
+from typing import Dict, Any, Iterator, Optional, Tuple
 from config import config
 from exceptions import FileOperationError
 
 logger = logging.getLogger(__name__)
-
-_created_dirs_cache = set()
-
-
-def _sanitize_filename(filename: str) -> str:
-    """
-    Очищает имя файла от небезопасных символов для использования в именах файлов метаданных.
-    Заменяет недопустимые символы на подчеркивания.
-    """
-    # Удаляем или заменяем небезопасные символы
-    unsafe_chars = '<>:"/\\|?*'
-    safe_name = filename
-    for char in unsafe_chars:
-        safe_name = safe_name.replace(char, '_')
-    
-    # Ограничиваем длину имени для избежания проблем с длинными путями
-    # Оставляем достаточно места для хеша (8 символов) и расширения
-    max_length = 200
-    if len(safe_name) > max_length:
-        # Берем начало и конец имени файла
-        name_part = safe_name[:max_length // 2] + safe_name[-(max_length // 2):]
-        safe_name = name_part
-    
-    return safe_name
-
-
-@lru_cache(maxsize=10000)
-def _get_path_hash(rel_path_normalized: str) -> str:
-    """
-    Вычисляет MD5 хеш от нормализованного относительного пути.
-    Кешируется для ускорения повторных вычислений.
-    """
-    return hashlib.md5(rel_path_normalized.encode('utf-8')).hexdigest()
 
 
 @lru_cache(maxsize=10000)
@@ -77,6 +44,19 @@ def get_thumbnail_path(image_path: str) -> str:
     return get_metadata_file_path(image_path, ".webp")
 
 
+def get_absolute_path(relative_path: str, root_folder: Optional[str] = None) -> str:
+    """
+    Преобразует относительный путь в абсолютный.
+    """
+    if root_folder is None:
+        root_folder = config.IMAGE_FOLDER
+    
+    if os.path.isabs(relative_path):
+        return relative_path
+    
+    return os.path.normpath(os.path.join(root_folder, relative_path))
+
+
 def get_image_paths(folder=None):
     if folder:
         if not os.path.isdir(folder):
@@ -97,28 +77,28 @@ def get_image_paths(folder=None):
         return list(walk_images())
 
 
-def get_absolute_path(relative_path: str, root_folder: Optional[str] = None) -> str:
-    if root_folder is None:
-        root_folder = config.IMAGE_FOLDER
+def get_absolute_paths(metadata: Dict[str, Any], root_folder: Optional[str] = None) -> Tuple[str, str, str]:
+    """
+    Получает все абсолютные пути из метаданных.
+    Возвращает кортеж (image_path, thumbnail_path, metadata_path).
+    """
+    image_path = metadata.get("image_path", "")
+    if not image_path:
+        raise FileOperationError("Путь к изображению не найден в метаданных")
     
-    if not relative_path:
-        return os.path.normpath(os.path.abspath(root_folder))
+    thumbnail_path = metadata.get("thumbnail_path", "")
+    if not thumbnail_path:
+        raise FileOperationError("Путь к миниатюре не найден в метаданных")
     
-    root = os.path.normpath(os.path.abspath(root_folder))
-    relative_path = relative_path.lstrip('/\\')
-    while relative_path.startswith('..'):
-        relative_path = relative_path[3:].lstrip('/\\')
+    metadata_path = metadata.get("metadata_path", "")
+    if not metadata_path:
+        raise FileOperationError("Путь к метаданным не найден в метаданных")
     
-    full_path = os.path.normpath(os.path.abspath(os.path.join(root, relative_path)))
-    
-    root_abs = os.path.abspath(root)
-    full_abs = os.path.abspath(full_path)
-    
-    if not (full_abs == root_abs or full_abs.startswith(root_abs + os.sep)):
-        logger.warning(f"Попытка доступа к пути вне корневой директории: {relative_path}")
-        raise FileOperationError(f"Путь находится вне разрешенной директории")
-    
-    return full_path
+    return (
+        get_absolute_path(image_path, root_folder),
+        get_absolute_path(thumbnail_path, root_folder),
+        get_absolute_path(metadata_path, root_folder)
+    )
 
 
 def get_relative_path(absolute_path: str, root_folder: Optional[str] = None) -> str:

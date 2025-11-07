@@ -1,7 +1,10 @@
 const rating = {
     set(event, filename, ratingValue) {
         event.stopPropagation();
-        const img = state.currentImages.find(i => i.filename === filename);
+        const img = state.currentImages.find(i => {
+            const imagePath = i.metadata?.image_path || "";
+            return imagePath === filename;
+        });
         if (!img) return;
 
         const currentRating = img.metadata.rating || 0;

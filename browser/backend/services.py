@@ -9,7 +9,9 @@ from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from exceptions import FileOperationError, InvalidRequestError
-from paths import get_absolute_path, get_metadata_path, get_thumbnail_path
+from paths import get_absolute_path, get_relative_path
+from paths import get_absolute_paths
+from paths import get_metadata_path, get_thumbnail_path  # Используются только для первичной инициализации
 from metadata import load_metadata, save_metadata
 from image import collect_images, filter_images, sort_images
 from config import config
@@ -36,18 +38,16 @@ class ImageService:
     
     @staticmethod
     def delete_image(filename: str) -> None:
+        """Удаляет изображение и связанные файлы. Пути берутся из метаданных."""
         base = get_absolute_path(filename)
-        thumb = get_thumbnail_path(base)
-        meta = get_metadata_path(base)
+        mtime = os.path.getmtime(base)
+        metadata = load_metadata(base, mtime)
         
-        try:
-            if os.path.exists(base):
-                os.remove(base)
-            for path in (thumb, meta):
-                if os.path.exists(path):
-                    os.remove(path)
-        except OSError as e:
-            raise FileOperationError(f"Не удалось удалить изображение: {e}")
+        _, thumb, meta = get_absolute_paths(metadata)
+        
+        os.remove(base)
+        os.remove(thumb)
+        os.remove(meta)
 
 
 class MetadataService:
@@ -55,20 +55,14 @@ class MetadataService:
     def update_metadata(filenames: List[str], updates: Dict) -> None:
         for filename in filenames:
             image_path = get_absolute_path(filename)
-            if not os.path.exists(image_path):
-                continue
-                
-            try:
-                mtime = os.path.getmtime(image_path)
-                metadata = load_metadata(image_path, mtime)
-                
-                for key in ("checked", "rating", "tags"):
-                    if key in updates:
-                        metadata[key] = updates[key]
-                        
-                save_metadata(image_path, metadata)
-            except Exception as e:
-                raise FileOperationError(f"Не удалось обновить метаданные для {filename}: {e}")
+            mtime = os.path.getmtime(image_path)
+            metadata = load_metadata(image_path, mtime)
+            
+            for key in ("checked", "rating", "tags"):
+                if key in updates:
+                    metadata[key] = updates[key]
+                    
+            save_metadata(metadata)
         
         clear_caches()
     
@@ -77,19 +71,15 @@ class MetadataService:
         images = _get_filtered_images(folder_path, search)
         
         def process_single(img):
-            image_path = get_absolute_path(img["filename"])
-            if not os.path.exists(image_path):
-                return 0
+            filename = img.get("metadata", {}).get("image_path", "")
+            image_path = get_absolute_path(filename)
+            mtime = os.path.getmtime(image_path)
+            metadata = load_metadata(image_path, mtime)
             
-            try:
-                mtime = os.path.getmtime(image_path)
-                metadata = load_metadata(image_path, mtime)
-                if metadata.get("checked"):
-                    metadata["checked"] = False
-                    save_metadata(image_path, metadata)
-                    return 1
-            except Exception as e:
-                logger.warning(f"Не удалось снять отметку с {img['filename']}: {e}")
+            if metadata.get("checked"):
+                metadata["checked"] = False
+                save_metadata(metadata)
+                return 1
             return 0
         
         if len(images) < 100:
@@ -108,26 +98,16 @@ class MetadataService:
         images = _get_filtered_images(folder_path, search)
         
         def process_single(img):
-            image_path = get_absolute_path(img["filename"])
-            if not os.path.exists(image_path):
-                return 0
+            filename = img.get("metadata", {}).get("image_path", "")
+            image_path = get_absolute_path(filename)
+            mtime = os.path.getmtime(image_path)
+            metadata = load_metadata(image_path, mtime)
             
-            try:
-                meta_path = get_metadata_path(image_path)
-                if os.path.exists(meta_path):
-                    os.remove(meta_path)
-                    return 1
-            except Exception as e:
-                logger.warning(f"Не удалось удалить метаданные для {img['filename']}: {e}")
-            return 0
+            _, _, meta_path = get_absolute_paths(metadata)
+            os.remove(meta_path)
+            return 1
         
-        if len(images) < 100:
-            count = sum(process_single(img) for img in images)
-        else:
-            max_workers = min(16, (os.cpu_count() or 1) * 2)
-            with ThreadPoolExecutor(max_workers=max_workers) as pool:
-                results = list(pool.map(process_single, images))
-                count = sum(results)
+        count = sum(process_single(img) for img in images)
         
         clear_caches()
         return count
@@ -148,23 +128,24 @@ class FavoritesService:
         if os.path.abspath(src) == os.path.abspath(dst):
             raise InvalidRequestError("Источник и назначение совпадают")
         
-        try:
-            shutil.copy2(src, dst)
-            
-            src_meta = get_metadata_path(src)
-            dst_meta = get_metadata_path(dst)
-            
-            meta = {}
-            if os.path.exists(src_meta):
-                with open(src_meta, "r", encoding="utf-8") as f:
-                    meta = json.load(f)
-            
-            tags = set(meta.get("tags", []))
-            tags.add("favorite")
-            meta["tags"] = sorted(tags)
-            
-            with open(dst_meta, "w", encoding="utf-8") as f:
-                json.dump(meta, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            raise FileOperationError(f"Не удалось скопировать в избранное: {e}")
+        shutil.copy2(src, dst)
+        
+        mtime = os.path.getmtime(src)
+        src_metadata = load_metadata(src, mtime)
+        _, _, src_meta = get_absolute_paths(src_metadata)
+        dst_meta = get_metadata_path(dst)
+        
+        with open(src_meta, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+        
+        meta["image_path"] = get_relative_path(dst)
+        meta["metadata_path"] = get_relative_path(dst_meta)
+        meta["thumbnail_path"] = get_relative_path(get_thumbnail_path(dst))
+        
+        tags = set(meta["tags"])
+        tags.add("favorite")
+        meta["tags"] = sorted(tags)
+        
+        with open(dst_meta, "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
 

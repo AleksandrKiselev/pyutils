@@ -10,8 +10,7 @@ import hashlib
 import logging
 from functools import lru_cache
 from typing import Dict, Any
-from paths import get_metadata_path
-from tag import add_tags_from_prompt
+from paths import get_relative_path, get_absolute_path, get_metadata_path
 from exceptions import FileOperationError
 
 logger = logging.getLogger(__name__)
@@ -74,55 +73,24 @@ def _calculate_file_hash(image_path: str) -> str:
 
 @lru_cache(maxsize=10000)
 def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
+    """Загружает метаданные из файла. Использует вычисленный путь только при первой загрузке."""
+    # Вычисляем путь к метаданным только при первой загрузке
     path = get_metadata_path(image_path)
-    metadata = {}
-    modified = False
-
-    try:
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    metadata = json.load(f)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Поврежденный файл метаданных: {path}, ошибка: {e}")
-                metadata = {}
-            except IOError as e:
-                logger.warning(f"Ошибка чтения файла метаданных: {path}, ошибка: {e}")
-                metadata = {}
-    except Exception as e:
-        logger.warning(f"Ошибка проверки метаданных для {image_path}: {e}")
-        metadata = {}
-
-    if "prompt" not in metadata:
-        metadata["prompt"] = extract_prompt_from_image(image_path)
-        modified = True
-    if "checked" not in metadata:
-        metadata["checked"] = False
-        modified = True
-    if "rating" not in metadata:
-        metadata["rating"] = 0
-        modified = True
-    if "tags" not in metadata:
-        try:
-            add_tags_from_prompt(image_path, metadata)
-        except Exception as e:
-            logger.error(f"Ошибка автоматического добавления тегов для {image_path}: {e}")
-            metadata["tags"] = []
-        modified = True
-    if "size" not in metadata:
-        metadata["size"] = os.path.getsize(image_path)
-        modified = True
-    if "hash" not in metadata:
-        metadata["hash"] = _calculate_file_hash(image_path)
-        modified = True
-
-    if modified:
-        save_metadata(image_path, metadata)
-    return metadata
+    
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    
+    return {}
 
 
-def save_metadata(image_path: str, metadata: Dict[str, Any]) -> None:
-    path = get_metadata_path(image_path)
+def save_metadata(metadata: Dict[str, Any]) -> None:
+    """Сохраняет метаданные. Использует путь из metadata["metadata_path"]."""
+    metadata_path = metadata.get("metadata_path")
+    if not metadata_path:
+        raise FileOperationError("Путь к метаданным не найден в метаданных")
+    
+    path = get_absolute_path(metadata_path)
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
