@@ -5,69 +5,11 @@ import os
 import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from metadata import load_metadata, save_metadata, extract_prompt_from_image
-from metadata import _calculate_file_hash  # noqa: F401
-from thumbnail import create_thumbnail, needs_thumbnail
-from paths import get_absolute_path, get_relative_path, get_image_paths
-from paths import get_metadata_path, get_thumbnail_path, get_absolute_paths
-from tag import add_tags_from_prompt
+from metadata import load_metadata, get_metadata
+from paths import get_absolute_path, get_image_paths
 from config import config
 
 logger = logging.getLogger(__name__)
-
-
-def get_image(image_path):
-    """Получает изображение с метаданными. Создает миниатюру и заполняет метаданные при необходимости."""
-    mtime = os.path.getmtime(image_path)
-    metadata = load_metadata(image_path, mtime)
-    modified = False
-    
-    # Заполняем недостающие поля метаданных
-    if "prompt" not in metadata:
-        metadata["prompt"] = extract_prompt_from_image(image_path)
-        modified = True
-    if "checked" not in metadata:
-        metadata["checked"] = False
-        modified = True
-    if "rating" not in metadata:
-        metadata["rating"] = 0
-        modified = True
-    if "tags" not in metadata:
-        try:
-            add_tags_from_prompt(image_path, metadata)
-        except Exception as e:
-            logger.error(f"Ошибка добавления тегов для {image_path}: {e}")
-            metadata["tags"] = []
-        modified = True
-    if "size" not in metadata:
-        metadata["size"] = os.path.getsize(image_path)
-        modified = True
-    if "hash" not in metadata:
-        metadata["hash"] = _calculate_file_hash(image_path)
-        modified = True
-    
-    # Заполняем пути в метаданных только если их нет (первичная инициализация)
-    if "image_path" not in metadata:
-        metadata["image_path"] = get_relative_path(image_path)
-        modified = True
-    if "metadata_path" not in metadata:
-        metadata["metadata_path"] = get_relative_path(get_metadata_path(image_path))
-        modified = True
-    if "thumbnail_path" not in metadata:
-        metadata["thumbnail_path"] = get_relative_path(get_thumbnail_path(image_path))
-        modified = True
-    
-    # Создаем миниатюру если нужно
-    if needs_thumbnail(metadata):
-        create_thumbnail(metadata)
-        modified = True
-    
-    # Сохраняем метаданные если были изменения
-    if modified:
-        save_metadata(metadata)
-        load_metadata.cache_clear()
-    
-    return {"metadata": metadata}
 
 
 def needs_processing(folder=None):
@@ -79,15 +21,7 @@ def needs_processing(folder=None):
     for image_path in image_paths:
         mtime = os.path.getmtime(image_path)
         metadata = load_metadata(image_path, mtime)
-        
-        if needs_thumbnail(metadata):
-            return True
-
-        if not metadata.get("metadata_path"):
-            return True
-        
-        _, _, meta_path = get_absolute_paths(metadata)
-        if not os.path.exists(meta_path):
+        if not metadata:
             return True
 
     return False
@@ -111,7 +45,7 @@ def collect_images(folder=None, progress_callback=None):
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {}
         for idx, path in enumerate(image_paths):
-            future = pool.submit(get_image, path)
+            future = pool.submit(get_metadata, path)
             futures[future] = idx
         
         for future in as_completed(futures):

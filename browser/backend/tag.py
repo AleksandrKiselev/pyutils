@@ -5,7 +5,7 @@ import os
 import logging
 import re
 import unicodedata
-from typing import Set, Dict, Any
+from typing import Set, List
 from rapidfuzz import fuzz
 from config import config
 from PIL import Image
@@ -38,25 +38,31 @@ def get_image_tags(image_path: str) -> Set[str]:
         return set()
 
 
-def add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], threshold: float = 0.9) -> None:
-    prompt = metadata.get("prompt", "").lower()
-    prompt_tags = set()
-    if prompt:
-        all_tags = [normalize(tag.lower()) for tag in config.AUTO_TAGS]
-        tokens = [
-            normalize(token.lower())
-            for token in re.split(r"[.,:]|\bBREAK\b", prompt, flags=re.IGNORECASE)
-            if token.strip()
-        ]
+def extract_tags_from_prompt(image_path: str, prompt: str, threshold: float = 0.9) -> List[str]:
+    """Извлекает теги из промпта и изображения. При ошибке возвращает пустой список."""
+    try:
+        prompt_tags = set()
+        if prompt:
+            prompt_lower = prompt.lower()
+            all_tags = [normalize(tag.lower()) for tag in config.AUTO_TAGS]
+            tokens = [
+                normalize(token.lower())
+                for token in re.split(r"[.,:]|\bBREAK\b", prompt_lower, flags=re.IGNORECASE)
+                if token.strip()
+            ]
 
-        def check_tag(tag):
-            if tag in prompt:
-                return True
-            for token in tokens:
-                if fuzz.ratio(token, tag) / 100.0 >= threshold:
+            def check_tag(tag):
+                if tag in prompt_lower:
                     return True
-            return False
+                for token in tokens:
+                    if fuzz.ratio(token, tag) / 100.0 >= threshold:
+                        return True
+                return False
 
-        prompt_tags = {tag for tag in all_tags if check_tag(tag)}
+            prompt_tags = {tag for tag in all_tags if check_tag(tag)}
 
-    metadata["tags"] = sorted(prompt_tags) + sorted(get_image_tags(image_path))
+        image_tags = get_image_tags(image_path)
+        return sorted(prompt_tags | image_tags)
+    except Exception as e:
+        logger.warning(f"Ошибка извлечения тегов для {image_path}: {e}")
+        return []

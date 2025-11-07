@@ -8,7 +8,6 @@ import logging
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor
 
-from exceptions import FileOperationError, InvalidRequestError
 from paths import get_absolute_path, get_relative_path
 from paths import get_absolute_paths
 from paths import get_metadata_path, get_thumbnail_path  # Используются только для первичной инициализации
@@ -120,13 +119,13 @@ class FavoritesService:
         dst_dir = config.FAVORITES_FOLDER
         
         if not dst_dir:
-            raise InvalidRequestError("В конфиге не указана папка избранного")
+            raise ValueError("В конфиге не указана папка избранного")
         
         dst = os.path.join(dst_dir, os.path.basename(filename))
         os.makedirs(dst_dir, exist_ok=True)
         
         if os.path.abspath(src) == os.path.abspath(dst):
-            raise InvalidRequestError("Источник и назначение совпадают")
+            raise ValueError("Источник и назначение совпадают")
         
         shutil.copy2(src, dst)
         

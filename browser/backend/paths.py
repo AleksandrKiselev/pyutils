@@ -7,7 +7,6 @@ import logging
 from functools import lru_cache
 from typing import Dict, Any, Iterator, Optional, Tuple
 from config import config
-from exceptions import FileOperationError
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ def get_metadata_file_path(image_path: str, ext: str) -> str:
         return os.path.join(meta_dir, new_filename)
     except OSError as e:
         logger.error(f"Ошибка создания директории метаданных для {image_path}: {e}")
-        raise FileOperationError(f"Не удалось создать директорию метаданных: {e}") from e
+        raise OSError(f"Не удалось создать директорию метаданных: {e}") from e
 
 
 def get_metadata_path(image_path: str) -> str:
@@ -84,15 +83,15 @@ def get_absolute_paths(metadata: Dict[str, Any], root_folder: Optional[str] = No
     """
     image_path = metadata.get("image_path", "")
     if not image_path:
-        raise FileOperationError("Путь к изображению не найден в метаданных")
+        raise ValueError("Путь к изображению не найден в метаданных")
     
     thumbnail_path = metadata.get("thumbnail_path", "")
     if not thumbnail_path:
-        raise FileOperationError("Путь к миниатюре не найден в метаданных")
+        raise ValueError("Путь к миниатюре не найден в метаданных")
     
     metadata_path = metadata.get("metadata_path", "")
     if not metadata_path:
-        raise FileOperationError("Путь к метаданным не найден в метаданных")
+        raise ValueError("Путь к метаданным не найден в метаданных")
     
     return (
         get_absolute_path(image_path, root_folder),
@@ -127,7 +126,7 @@ def walk_images(root_folder: Optional[str] = None) -> Iterator[str]:
                     yield os.path.join(root, file)
     except OSError as e:
         logger.error(f"Ошибка обхода дерева директорий {root_folder}: {e}")
-        raise FileOperationError(f"Не удалось обойти дерево директорий: {e}") from e
+        raise OSError(f"Не удалось обойти дерево директорий: {e}") from e
 
 
 def build_folder_tree(base_path: str, relative: str = "") -> Dict[str, Any]:
@@ -161,7 +160,7 @@ def build_folder_tree(base_path: str, relative: str = "") -> Dict[str, Any]:
                     }
     except OSError as e:
         logger.error(f"Ошибка построения дерева папок для {full_path}: {e}")
-        raise FileOperationError(f"Не удалось построить дерево папок: {e}") from e
+        raise OSError(f"Не удалось построить дерево папок: {e}") from e
     
     return tree
 
