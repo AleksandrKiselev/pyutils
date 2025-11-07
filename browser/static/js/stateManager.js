@@ -2,7 +2,6 @@ const stateManager = {
     save() {
         const state = {
             currentPath: window.location.pathname,
-            searchQuery: DOM.searchBox.value.trim(),
             sortBy: DOM.sortSelect.value,
             sidebarVisible: document.body.classList.contains("sidebar-visible")
         };
@@ -15,11 +14,6 @@ const stateManager = {
 
         try {
             const saved = JSON.parse(raw);
-
-            if (saved.searchQuery !== undefined) {
-                state.searchQuery = saved.searchQuery;
-                DOM.searchBox.value = saved.searchQuery;
-            }
 
             if (saved.sortBy) {
                 state.sortBy = saved.sortBy;

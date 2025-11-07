@@ -45,47 +45,24 @@ def _get_path_hash(rel_path_normalized: str) -> str:
     return hashlib.md5(rel_path_normalized.encode('utf-8')).hexdigest()
 
 
+@lru_cache(maxsize=10000)
+def _get_filename_hash(image_path: str) -> str:
+    filename = os.path.basename(image_path)
+    return hashlib.md5(filename.encode('utf-8')).hexdigest()
+
+
 def get_metadata_file_path(image_path: str, ext: str) -> str:
     try:
-        if not os.path.isabs(image_path):
-            image_path = get_absolute_path(image_path)
-        
         rel_path = get_relative_path(image_path)
-        
-        if rel_path.startswith(".."):
-            rel_dir = ""
-            logger.warning(f"Файл {image_path} находится вне IMAGE_FOLDER, метаданные будут в корне .metadata")
-        else:
-            rel_dir = os.path.dirname(rel_path) or ""
-        
-        filename = os.path.basename(image_path)
-        
+        rel_dir = os.path.dirname(rel_path)
         meta_base = os.path.join(config.IMAGE_FOLDER, ".metadata")
-        if rel_dir:
-            meta_dir = os.path.join(meta_base, rel_dir)
-        else:
-            meta_dir = meta_base
-        
-        if meta_dir not in _created_dirs_cache:
-            os.makedirs(meta_dir, exist_ok=True)
-            _created_dirs_cache.add(meta_dir)
-        
-        # Используем хеш относительного пути для гарантированной уникальности
-        # Это решает проблему конфликтов для файлов с одинаковым именем, но разными расширениями,
-        # а также для файлов со сложными именами (точки, специальные символы и т.д.)
-        # Хеш вычисляется от нормализованного относительного пути (с использованием '/' как разделителя)
-        # Используется кешированная функция для ускорения повторных вычислений
-        rel_path_normalized = rel_path.replace("\\", "/")
-        path_hash = _get_path_hash(rel_path_normalized)
-        
-        # Сохраняем читаемость: используем короткое имя файла + хеш для уникальности
-        # Это позволяет легко найти файл по имени, но гарантирует отсутствие конфликтов
-        # Формат: имя_расширение_хеш.расширение_метаданных (например: image_png_e5f6g7h8.webp)
-        base_name, original_ext = os.path.splitext(filename)
-        safe_base = _sanitize_filename(base_name)
-        safe_ext = original_ext.lstrip('.').lower() if original_ext else 'noext'
-        new_filename = f"{safe_base}_{safe_ext}_{path_hash[:8]}{ext}"
-        
+        meta_dir = os.path.join(meta_base, rel_dir)
+        os.makedirs(meta_dir, exist_ok=True)
+
+        # Формируем уникальное имя файла метаданных на основе хеша от имени файла (с расширением)
+        filename_hash = _get_filename_hash(image_path)
+        new_filename = f"{filename_hash}{ext}"
+
         return os.path.join(meta_dir, new_filename)
     except OSError as e:
         logger.error(f"Ошибка создания директории метаданных для {image_path}: {e}")
