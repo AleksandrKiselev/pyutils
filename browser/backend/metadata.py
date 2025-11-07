@@ -6,7 +6,9 @@ import os
 import re
 import struct
 import zlib
+import hashlib
 import logging
+from functools import lru_cache
 from typing import Dict, Any
 from paths import get_metadata_path
 from tag import add_tags_from_prompt
@@ -56,7 +58,22 @@ def extract_prompt_from_image(image_path: str) -> str:
         return "Метаданные не найдены"
 
 
-def load_metadata(image_path: str) -> Dict[str, Any]:
+def _calculate_file_hash(image_path: str) -> str:
+    """Вычисляет MD5 хеш файла."""
+    try:
+        hash_md5 = hashlib.md5()
+        with open(image_path, "rb") as f:
+            # Читаем файл блоками для экономии памяти
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+        return hash_md5.hexdigest()
+    except Exception as e:
+        logger.warning(f"Ошибка вычисления хеша для {image_path}: {e}")
+        return ""
+
+
+@lru_cache(maxsize=10000)
+def load_metadata(image_path: str, mtime: float) -> Dict[str, Any]:
     path = get_metadata_path(image_path)
     metadata = {}
     modified = False
@@ -91,6 +108,12 @@ def load_metadata(image_path: str) -> Dict[str, Any]:
         except Exception as e:
             logger.error(f"Ошибка автоматического добавления тегов для {image_path}: {e}")
             metadata["tags"] = []
+        modified = True
+    if "size" not in metadata:
+        metadata["size"] = os.path.getsize(image_path)
+        modified = True
+    if "hash" not in metadata:
+        metadata["hash"] = _calculate_file_hash(image_path)
         modified = True
 
     if modified:

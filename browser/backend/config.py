@@ -12,7 +12,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "favorites_folder": "static/images/favorites",
     "thumbnail_size": 512,
     "items_per_page": 20,
-    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp"]
+    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp", ".webm"]
 }
 
 

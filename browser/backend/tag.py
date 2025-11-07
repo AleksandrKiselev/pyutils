@@ -40,7 +40,7 @@ def get_image_tags(image_path: str) -> Set[str]:
 
 def add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], threshold: float = 0.9) -> None:
     prompt = metadata.get("prompt", "").lower()
-    prompt_tags = list()
+    prompt_tags = set()
     if prompt:
         all_tags = [normalize(tag.lower()) for tag in config.AUTO_TAGS]
         tokens = [
@@ -59,4 +59,4 @@ def add_tags_from_prompt(image_path: str, metadata: Dict[str, Any], threshold: f
 
         prompt_tags = {tag for tag in all_tags if check_tag(tag)}
 
-    metadata["tags"] = sorted(prompt_tags) + list(get_image_tags(image_path))
+    metadata["tags"] = sorted(prompt_tags) + sorted(get_image_tags(image_path))

@@ -3,7 +3,7 @@
     "favorites_folder": "d:\\AI-Software\\configs\\images\\favorites",
     "thumbnail_size": 512,
     "items_per_page": 20,
-    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp"],
+    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp", ".webm"],
     "auto_tags": [
         "solo", "1girl", "2girls", "3girls", "1male", "2males", "3males", "1boy", "2boys", "3boys",
         "multiple males", "group sex", "gangbang", "threesome", "orgy",

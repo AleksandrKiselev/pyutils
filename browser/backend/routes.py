@@ -139,9 +139,18 @@ def delete_image():
 def update_metadata():
     try:
         data = validate_json_request(request)
-        filenames = data.get("filenames") or [data.get("filename")]
+        filenames = data.get("filenames")
+        if not filenames:
+            filename = data.get("filename")
+            if filename:
+                filenames = [filename]
         
         if not filenames or not isinstance(filenames, list):
+            raise InvalidRequestError("Не указаны имена файлов")
+        
+        # Фильтруем None значения
+        filenames = [f for f in filenames if f]
+        if not filenames:
             raise InvalidRequestError("Не указаны имена файлов")
         
         updates = {}

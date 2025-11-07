@@ -19,7 +19,7 @@ const fullscreen = {
         DOM.fullscreenPrompt.textContent = data.metadata.prompt || "";
 
         const filenameOnly = data.filename ? data.filename.split(/[/\\]/).pop() : "";
-        const fileSize = data.size || 0;
+        const fileSize = data.metadata.size || 0;
         const fileSizeFormatted = fileSize >= 1024 * 1024 
             ? (fileSize / (1024 * 1024)).toFixed(2) + " MB"
             : fileSize >= 1024

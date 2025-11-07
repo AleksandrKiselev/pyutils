@@ -2,7 +2,9 @@
 Утилиты для операций с файлами и папками.
 """
 import os
+import hashlib
 import logging
+from functools import lru_cache
 from typing import Dict, Any, Iterator, Optional
 from config import config
 from exceptions import FileOperationError
@@ -10,6 +12,38 @@ from exceptions import FileOperationError
 logger = logging.getLogger(__name__)
 
 _created_dirs_cache = set()
+
+
+def _sanitize_filename(filename: str) -> str:
+    """
+    Очищает имя файла от небезопасных символов для использования в именах файлов метаданных.
+    Заменяет недопустимые символы на подчеркивания.
+    """
+    # Удаляем или заменяем небезопасные символы
+    unsafe_chars = '<>:"/\\|?*'
+    safe_name = filename
+    for char in unsafe_chars:
+        safe_name = safe_name.replace(char, '_')
+    
+    # Ограничиваем длину имени для избежания проблем с длинными путями
+    # Оставляем достаточно места для хеша (8 символов) и расширения
+    max_length = 200
+    if len(safe_name) > max_length:
+        # Берем начало и конец имени файла
+        name_part = safe_name[:max_length // 2] + safe_name[-(max_length // 2):]
+        safe_name = name_part
+    
+    return safe_name
+
+
+@lru_cache(maxsize=10000)
+def _get_path_hash(rel_path_normalized: str) -> str:
+    """
+    Вычисляет MD5 хеш от нормализованного относительного пути.
+    Кешируется для ускорения повторных вычислений.
+    """
+    return hashlib.md5(rel_path_normalized.encode('utf-8')).hexdigest()
+
 
 def get_metadata_file_path(image_path: str, ext: str) -> str:
     try:
@@ -22,7 +56,7 @@ def get_metadata_file_path(image_path: str, ext: str) -> str:
             rel_dir = ""
             logger.warning(f"Файл {image_path} находится вне IMAGE_FOLDER, метаданные будут в корне .metadata")
         else:
-            rel_dir = os.path.dirname(rel_path) if os.path.dirname(rel_path) else ""
+            rel_dir = os.path.dirname(rel_path) or ""
         
         filename = os.path.basename(image_path)
         
@@ -36,8 +70,21 @@ def get_metadata_file_path(image_path: str, ext: str) -> str:
             os.makedirs(meta_dir, exist_ok=True)
             _created_dirs_cache.add(meta_dir)
         
-        base_name = os.path.splitext(filename)[0]
-        new_filename = base_name + ext
+        # Используем хеш относительного пути для гарантированной уникальности
+        # Это решает проблему конфликтов для файлов с одинаковым именем, но разными расширениями,
+        # а также для файлов со сложными именами (точки, специальные символы и т.д.)
+        # Хеш вычисляется от нормализованного относительного пути (с использованием '/' как разделителя)
+        # Используется кешированная функция для ускорения повторных вычислений
+        rel_path_normalized = rel_path.replace("\\", "/")
+        path_hash = _get_path_hash(rel_path_normalized)
+        
+        # Сохраняем читаемость: используем короткое имя файла + хеш для уникальности
+        # Это позволяет легко найти файл по имени, но гарантирует отсутствие конфликтов
+        # Формат: имя_расширение_хеш.расширение_метаданных (например: image_png_e5f6g7h8.webp)
+        base_name, original_ext = os.path.splitext(filename)
+        safe_base = _sanitize_filename(base_name)
+        safe_ext = original_ext.lstrip('.').lower() if original_ext else 'noext'
+        new_filename = f"{safe_base}_{safe_ext}_{path_hash[:8]}{ext}"
         
         return os.path.join(meta_dir, new_filename)
     except OSError as e:

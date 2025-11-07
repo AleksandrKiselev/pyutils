@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from exceptions import FileOperationError, InvalidRequestError
 from paths import get_absolute_path, get_metadata_path, get_thumbnail_path
 from metadata import load_metadata, save_metadata
-from image import collect_images, filter_images, sort_images, get_image
+from image import collect_images, filter_images, sort_images
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def _get_filtered_images(folder_path: Optional[str], search: str):
 
 
 def clear_caches():
-    get_image.cache_clear()
+    load_metadata.cache_clear()
 
 
 class ImageService:
