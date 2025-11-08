@@ -5,16 +5,14 @@ import struct
 import sys
 import zlib
 import hashlib
-import time
 import logging
 import uuid
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from PIL import Image, UnidentifiedImageError
 import fasteners
 
-from paths import get_relative_path, get_absolute_path, get_metadata_path, get_absolute_paths, get_thumbnail_path
+from paths import get_relative_path, get_absolute_path, get_metadata_path, get_thumbnail_path
 from config import config
 from tag import extract_tags_from_prompt
 
@@ -24,16 +22,10 @@ logger = logging.getLogger(__name__)
 class MetadataStore:
     def __init__(self):
         self._store: Dict[str, Dict[str, Any]] = {}
+        self._path_index: Dict[str, str] = {}
         self._rwlock = fasteners.ReaderWriterLock()
-        self._load_cache: Dict[tuple, Dict[str, Any]] = {}
 
-    def _load_from_file(self, image_path: str, mtime: float) -> Dict[str, Any]:
-        cache_key = (image_path, mtime)
-
-        with self._rwlock.read_lock():
-            if cache_key in self._load_cache:
-                return self._load_cache[cache_key]
-
+    def _load_from_file(self, image_path: str) -> Dict[str, Any]:
         path = get_metadata_path(image_path)
         metadata = {}
 
@@ -43,10 +35,6 @@ class MetadataStore:
                     metadata = json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"Ошибка чтения метаданных из {path}: {e}")
-
-        with self._rwlock.write_lock():
-            if len(self._load_cache) < 10000:
-                self._load_cache[cache_key] = metadata
 
         return metadata
 
@@ -120,35 +108,6 @@ class MetadataStore:
             logger.warning(f"Ошибка вычисления хеша для {image_path}: {e}")
             return ""
 
-    def _create_thumbnail(self, metadata: Dict[str, Any]) -> bool:
-        image_path, thumb_path, _ = get_absolute_paths(metadata)
-
-        for attempt in range(5):
-            try:
-                with Image.open(image_path) as img:
-                    img.thumbnail((config.THUMBNAIL_SIZE, config.THUMBNAIL_SIZE))
-                    Path(thumb_path).parent.mkdir(parents=True, exist_ok=True)
-                    img.save(thumb_path, "WEBP")
-                    return True
-            except (OSError, UnidentifiedImageError) as e:
-                if attempt < 4:
-                    logger.warning(f"Попытка {attempt + 1}/5: ожидание файла {image_path}")
-                    time.sleep(1)
-                else:
-                    logger.error(f"Не удалось создать миниатюру для {image_path}: {e}")
-                    return False
-        return False
-
-    def _needs_thumbnail(self, metadata: Dict[str, Any]) -> bool:
-        image_path, thumb_path, _ = get_absolute_paths(metadata)
-
-        if not os.path.exists(thumb_path):
-            return True
-
-        try:
-            return os.path.getmtime(image_path) > os.path.getmtime(thumb_path)
-        except OSError:
-            return True
 
     def has_metadata(self, image_path: str) -> bool:
         path = get_metadata_path(image_path)
@@ -163,11 +122,18 @@ class MetadataStore:
         self._save_to_file(metadata_copy)
 
         with self._rwlock.write_lock():
+            old_image_path = None
+            if metadata_id in self._store:
+                old_image_path = self._store[metadata_id].get("image_path")
+            
             self._store[metadata_id] = metadata_copy
             image_path = metadata_copy.get("image_path")
+            
+            if old_image_path and old_image_path != image_path:
+                self._path_index.pop(old_image_path, None)
+            
             if image_path:
-                abs_path = get_absolute_path(image_path)
-                self._load_cache = {k: v for k, v in self._load_cache.items() if k[0] != abs_path}
+                self._path_index[image_path] = metadata_id
 
     def update(self, metadata_id: str, updates: Dict[str, Any]) -> None:
         metadata = self.get_by_id(metadata_id)
@@ -182,25 +148,30 @@ class MetadataStore:
                 return self._store[metadata_id].copy()
         return None
 
+    def get_all(self) -> list:
+        with self._rwlock.read_lock():
+            return [metadata.copy() for metadata in self._store.values()]
+
     def get(self, image_path: str) -> Dict[str, Any]:
         rel_image_path = get_relative_path(image_path)
         metadata = None
         modified = False
 
         with self._rwlock.read_lock():
-            for stored_metadata in self._store.values():
-                if stored_metadata.get("image_path") == rel_image_path:
-                    metadata = stored_metadata.copy()
-                    break
+            metadata_id = self._path_index.get(rel_image_path)
+            if metadata_id and metadata_id in self._store:
+                metadata = self._store[metadata_id].copy()
 
         if not metadata:
-            mtime = os.path.getmtime(image_path)
-            file_metadata = self._load_from_file(image_path, mtime)
+            file_metadata = self._load_from_file(image_path)
 
             if file_metadata and file_metadata.get("id"):
                 metadata_id = file_metadata.get("id")
                 with self._rwlock.write_lock():
                     self._store[metadata_id] = file_metadata.copy()
+                    image_path_from_file = file_metadata.get("image_path")
+                    if image_path_from_file:
+                        self._path_index[image_path_from_file] = metadata_id
                 metadata = file_metadata.copy()
 
         if not metadata:
@@ -217,10 +188,6 @@ class MetadataStore:
                 "thumb_path": get_relative_path(get_thumbnail_path(image_path)),
                 "id": str(uuid.uuid4())
             }
-            modified = True
-
-        if self._needs_thumbnail(metadata):
-            self._create_thumbnail(metadata)
             modified = True
 
         if modified:
@@ -246,8 +213,7 @@ class MetadataStore:
             self._store.pop(metadata_id, None)
             image_path = metadata.get("image_path")
             if image_path:
-                abs_path = get_absolute_path(image_path)
-                self._load_cache = {k: v for k, v in self._load_cache.items() if k[0] != abs_path}
+                self._path_index.pop(image_path, None)
 
     def initialize(self) -> None:
         metadata_dir = os.path.join(config.IMAGE_FOLDER, ".metadata")
@@ -268,6 +234,9 @@ class MetadataStore:
                                 metadata_id = metadata.get("id")
                                 if metadata_id:
                                     self._store[metadata_id] = metadata
+                                    image_path = metadata.get("image_path")
+                                    if image_path:
+                                        self._path_index[image_path] = metadata_id
                                     count += 1
                                 else:
                                     logger.warning(f"Метаданные без ID найдены в {meta_path}")
@@ -279,7 +248,8 @@ class MetadataStore:
 
     def clear_cache(self) -> None:
         with self._rwlock.write_lock():
-            self._load_cache.clear()
+            self._store.clear()
+            self._path_index.clear()
 
 
 metadata_store = MetadataStore()

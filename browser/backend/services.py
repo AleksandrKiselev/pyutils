@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from paths import get_absolute_path, get_relative_path, get_absolute_paths, get_metadata_path, get_thumbnail_path
 from metadata import metadata_store
 from image import collect_images, filter_images, sort_images
+from thumbnail import ThumbnailService
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,11 @@ class ImageService:
                    order: str, limit: int, offset: int) -> List[Dict]:
         images = _get_filtered_images(folder_path, search)
         images = sort_images(images, sort_by, order)
-        return images[offset:offset + limit]
+        page_images = images[offset:offset + limit]
+        
+        ThumbnailService.ensure_thumbnails_batch(page_images)
+        
+        return page_images
 
     @staticmethod
     def delete_image(metadata_id: str) -> None:
