@@ -1,29 +1,29 @@
 const rating = {
-    set(event, filename, ratingValue) {
+    set(event, metadataId, ratingValue) {
         event.stopPropagation();
         const img = state.currentImages.find(i => {
-            const imagePath = i.metadata?.image_path || "";
-            return imagePath === filename;
+            const id = i?.id || "";
+            return id === metadataId;
         });
         if (!img) return;
 
-        const currentRating = img.metadata.rating || 0;
+        const currentRating = img.rating || 0;
         const newRating = currentRating === ratingValue ? 0 : ratingValue;
 
-        img.metadata.rating = newRating;
+        img.rating = newRating;
 
-        rating.updateStars(null, filename, newRating);
+        rating.updateStars(null, metadataId, newRating);
 
         utils.apiRequest("/update_metadata", {
-            body: JSON.stringify({ filename, rating: newRating })
+            body: JSON.stringify({ id: metadataId, rating: newRating })
         }).catch(error => {
             console.error("Ошибка сохранения рейтинга:", error);
         });
     },
 
-    updateStars(event, filename, ratingValue) {
+    updateStars(event, metadataId, ratingValue) {
         if (event) event.stopPropagation();
-        document.querySelectorAll(`.star[data-filename='${filename}']`).forEach(star => {
+        document.querySelectorAll(`.star[data-id='${metadataId}']`).forEach(star => {
             star.textContent = star.dataset.rating <= ratingValue ? STARRED_SYMBOL : UNSTARRED_SYMBOL;
         });
     },

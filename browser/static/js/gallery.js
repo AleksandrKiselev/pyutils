@@ -8,8 +8,6 @@ const gallery = {
             state.sortBy = currentSortBy;
         }
         
-        // Запускаем загрузку папок параллельно с проверкой метаданных
-        // Это ускоряет отображение прогресс-бара
         const foldersPromise = folders.load();
         
         state.offset = 0;
@@ -19,41 +17,24 @@ const gallery = {
             DOM.loading.style.display = "none";
         }
         
-        // Запускаем обработку изображений с прогресс-баром (не ждем folders.load)
         await gallery.ensureMetadataGenerated();
-        
-        // Ждем загрузку папок только если она еще не завершилась
         await foldersPromise;
         
         await gallery.loadMore();
     },
 
-    /**
-     * Общая функция для запуска генерации метаданных с прогресс-баром.
-     * Показывает прогресс-бар только если действительно нужна обработка.
-     */
     async ensureMetadataGenerated() {
-        if (!progressBar) {
-            console.warn("Progress bar not available");
-            return;
-        }
+        if (!progressBar) return;
 
         const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
-        
-        // Определяем, является ли поиск глобальным
         const isGlobalSearch = state.searchQuery && state.searchQuery.trim().toLowerCase().startsWith("g:");
-        
-        // Если глобальный поиск, проверяем все папки (пустая строка означает корневую папку)
-        // Если локальный поиск, проверяем только текущую папку
         const pathToCheck = isGlobalSearch ? "" : currentPath;
         
         try {
-            // Закрываем предыдущий прогресс-бар если он был активен
             if (progressBar.taskId) {
                 progressBar.close();
             }
 
-            // Сначала проверяем, нужна ли обработка (без показа прогресс-бара)
             let needs_processing = false;
             
             try {
@@ -73,18 +54,13 @@ const gallery = {
                 const { needs_processing: needs } = await checkResponse.json();
                 needs_processing = needs;
             } catch (error) {
-                // Если проверка заняла больше 2 секунд или произошла ошибка,
-                // запускаем обработку (безопаснее обработать лишний раз)
-                console.log("Проверка заняла слишком долго или произошла ошибка, запускаем обработку:", error.message);
                 needs_processing = true;
             }
             
-            // Если обработка не нужна, просто выходим без показа прогресс-бара
             if (!needs_processing) {
                 return;
             }
 
-            // Только если обработка нужна - показываем прогресс-бар и запускаем обработку
             const response = await fetch("/process_images", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -123,11 +99,8 @@ const gallery = {
             }
 
             images.forEach(img => {
-                if (!img.metadata) {
-                    img.metadata = {};
-                }
-                if (img.metadata.rating === undefined || img.metadata.rating === null) {
-                    img.metadata.rating = 0;
+                if (img.rating === undefined || img.rating === null) {
+                    img.rating = 0;
                 }
             });
 
@@ -137,8 +110,8 @@ const gallery = {
 
             gallery.loadCheckboxState();
             images.forEach(img => {
-                const imagePath = img.metadata?.image_path || "";
-                rating.updateStars(null, imagePath, img.metadata?.rating || 0);
+                const metadataId = img?.id || "";
+                rating.updateStars(null, metadataId, img?.rating || 0);
             });
             state.offset += images.length;
 
@@ -177,27 +150,25 @@ const gallery = {
 
     renderCards(images) {
         return images.map((img, index) => {
-            if (!img.metadata) {
-                img.metadata = {};
-            }
-            // Все пути хранятся только в метаданных
-            const imagePath = img.metadata?.image_path || "";
-            const thumbnailPath = img.metadata?.thumbnail_path || "";
+            // Все пути хранятся в метаданных
+            const metadataId = img?.id || "";
+            const thumbnailPath = img?.thumb_path || "";
+            const imagePath = img?.image_path || "";
             
-            const prompt = utils.escapeJS(img.metadata.prompt || "");
-            const filenameEscaped = utils.escapeJS(imagePath);
-            const filenameAttrEscaped = imagePath ? imagePath.replace(/"/g, "&quot;").replace(/'/g, "&#39;") : "";
+            const prompt = utils.escapeJS(img.prompt || "");
+            const metadataIdEscaped = utils.escapeJS(metadataId);
+            const metadataIdAttrEscaped = metadataId ? metadataId.replace(/"/g, "&quot;").replace(/'/g, "&#39;") : "";
             const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
             const filenameOnlyEscaped = utils.escapeJS(filenameOnly);
-            const fileSize = img.metadata.size || 0;
+            const fileSize = img.size || 0;
             const fileSizeFormatted = fileSize >= 1024 * 1024 
                 ? (fileSize / (1024 * 1024)).toFixed(2) + " MB"
                 : fileSize >= 1024
                 ? (fileSize / 1024).toFixed(2) + " KB"
                 : fileSize + " B";
-            const ratingValue = img.metadata.rating || 0;
+            const ratingValue = img.rating || 0;
 
-            const tags = img.metadata.tags || [];
+            const tags = img.tags || [];
             const resolutionTag = tags.find(tag => /^\d+x\d+$/.test(tag));
             let aspectRatioStyle = "";
             if (resolutionTag) {
@@ -213,15 +184,15 @@ const gallery = {
                      onmouseenter="rating.showStars(event)" onmouseleave="rating.hideStars(event)" ${aspectRatioStyle}>
                     <div class="image-buttons">
                         <button class="copy-btn" onclick="clipboard.copy(event, '${prompt}')" title="Копировать промпт">⧉</button>
-                        <button class="copy-favorites-btn" onclick="favorites.copy(event, '${filenameEscaped}')" title="В избранное">★</button>
-                        <input type="checkbox" class="image-checkbox" data-filename="${filenameAttrEscaped}"
+                        <button class="copy-favorites-btn" onclick="favorites.copy(event, '${metadataIdEscaped}')" title="В избранное">★</button>
+                        <input type="checkbox" class="image-checkbox" data-id="${metadataIdAttrEscaped}"
                                onclick="event.stopPropagation(); gallery.saveCheckboxState(event);" title="Выбрать">
-                        <button class="delete-btn" onclick="gallery.deleteThumbnail(event, '${filenameEscaped}')" title="Удалить">✕</button>
+                        <button class="delete-btn" onclick="gallery.deleteThumbnail(event, '${metadataIdEscaped}')" title="Удалить">✕</button>
                     </div>
                     <div class="image-rating" style="opacity: 0;">
                         ${Array.from({ length: MAX_RATING }, (_, i) => i + 1).map(star => `
-                            <span class="star" data-filename="${filenameAttrEscaped}" data-rating="${star}"
-                                  onclick="rating.set(event, '${filenameEscaped}', ${star})">
+                            <span class="star" data-id="${metadataIdAttrEscaped}" data-rating="${star}"
+                                  onclick="rating.set(event, '${metadataIdEscaped}', ${star})">
                                 ${ratingValue >= star ? STARRED_SYMBOL : UNSTARRED_SYMBOL}
                             </span>`).join("")}
                     </div>
@@ -284,13 +255,13 @@ const gallery = {
         }, 300);
     },
 
-    async deleteThumbnail(event, filename) {
+    async deleteThumbnail(event, metadataId) {
         event.stopPropagation();
         if (!confirm("Удалить изображение?")) return;
 
         try {
             const result = await utils.apiRequest("/delete_image", {
-                body: JSON.stringify({ filename })
+                body: JSON.stringify({ id: metadataId })
             });
 
             if (result.success) {
@@ -306,18 +277,18 @@ const gallery = {
     saveCheckboxState(event) {
         const cb = event.target;
         utils.apiRequest("/update_metadata", {
-            body: JSON.stringify({ filename: cb.dataset.filename, checked: cb.checked })
+            body: JSON.stringify({ id: cb.dataset.id, checked: cb.checked })
         }).catch(console.error);
     },
 
     loadCheckboxState() {
         document.querySelectorAll(".image-checkbox").forEach(cb => {
-            const filename = cb.dataset.filename;
+            const metadataId = cb.dataset.id;
             const img = state.currentImages.find(i => {
-                const imagePath = i.metadata?.image_path || "";
-                return imagePath === filename;
+                const id = i?.id || "";
+                return id === metadataId;
             });
-            if (img) cb.checked = !!img.metadata?.checked;
+            if (img) cb.checked = !!img?.checked;
         });
         gallery.updateImageOpacity();
     },
@@ -354,8 +325,8 @@ const gallery = {
                 });
 
                 state.currentImages.forEach(img => {
-                    if (img.metadata) {
-                        img.metadata.checked = false;
+                    if (img) {
+                        img.checked = false;
                     }
                 });
             }

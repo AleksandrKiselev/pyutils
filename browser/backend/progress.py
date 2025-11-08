@@ -1,74 +1,102 @@
-"""
-Модуль для отслеживания прогресса обработки изображений.
-"""
 import uuid
 import threading
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 
-progress_storage: Dict[str, Dict] = {}
-storage_lock = threading.Lock()
-PROGRESS_TTL = timedelta(minutes=10)
+
+class ProgressManager:
+    def __init__(self, ttl_minutes: int = 10):
+        self._storage: Dict[str, Dict] = {}
+        self._lock = threading.Lock()
+        self._ttl = timedelta(minutes=ttl_minutes)
+    
+    def create_task(self) -> str:
+        task_id = str(uuid.uuid4())
+        with self._lock:
+            self._storage[task_id] = {
+                "total": 0,
+                "processed": 0,
+                "status": "starting",
+                "message": "Инициализация…",
+                "created_at": datetime.now(),
+                "error": None
+            }
+        return task_id
+    
+    def update(self, task_id: str, processed: int, total: int, message: Optional[str] = None) -> None:
+        with self._lock:
+            if task_id not in self._storage:
+                return
+            
+            self._storage[task_id].update({
+                "processed": processed,
+                "total": total,
+                "status": "processing",
+                "created_at": datetime.now()
+            })
+            if message:
+                self._storage[task_id]["message"] = message
+    
+    def complete(self, task_id: str, message: str = "Завершено") -> None:
+        with self._lock:
+            if task_id not in self._storage:
+                return
+            
+            task = self._storage[task_id]
+            task.update({
+                "status": "completed",
+                "message": message,
+                "processed": task["total"]
+            })
+    
+    def error(self, task_id: str, error_message: str) -> None:
+        with self._lock:
+            if task_id not in self._storage:
+                return
+            
+            self._storage[task_id].update({
+                "status": "error",
+                "message": "Ошибка",
+                "error": error_message
+            })
+    
+    def get(self, task_id: str) -> Optional[Dict]:
+        with self._lock:
+            if task_id not in self._storage:
+                return None
+            
+            self._cleanup()
+            return self._storage[task_id].copy()
+    
+    def _cleanup(self) -> None:
+        now = datetime.now()
+        expired_keys = [
+            task_id for task_id, data in self._storage.items()
+            if now - data["created_at"] > self._ttl
+        ]
+        for key in expired_keys:
+            del self._storage[key]
+
+
+_progress_manager = ProgressManager()
 
 
 def create_progress_task() -> str:
-    task_id = str(uuid.uuid4())
-    with storage_lock:
-        progress_storage[task_id] = {
-            "total": 0,
-            "processed": 0,
-            "status": "starting",
-            "message": "Инициализация…",
-            "created_at": datetime.now(),
-            "error": None
-        }
-    return task_id
+    return _progress_manager.create_task()
 
 
-def update_progress(task_id: str, processed: int, total: int, message: str = None):
-    with storage_lock:
-        if task_id in progress_storage:
-            progress_storage[task_id]["processed"] = processed
-            progress_storage[task_id]["total"] = total
-            progress_storage[task_id]["status"] = "processing"
-            if message:
-                progress_storage[task_id]["message"] = message
-            progress_storage[task_id]["created_at"] = datetime.now()
+def update_progress(task_id: str, processed: int, total: int, message: Optional[str] = None) -> None:
+    _progress_manager.update(task_id, processed, total, message)
 
 
-def complete_progress(task_id: str, message: str = "Завершено"):
-    with storage_lock:
-        if task_id in progress_storage:
-            progress_storage[task_id]["status"] = "completed"
-            progress_storage[task_id]["message"] = message
-            progress_storage[task_id]["processed"] = progress_storage[task_id]["total"]
+def complete_progress(task_id: str, message: str = "Завершено") -> None:
+    _progress_manager.complete(task_id, message)
 
 
-def error_progress(task_id: str, error_message: str):
-    with storage_lock:
-        if task_id in progress_storage:
-            progress_storage[task_id]["status"] = "error"
-            progress_storage[task_id]["message"] = "Ошибка"
-            progress_storage[task_id]["error"] = error_message
+def error_progress(task_id: str, error_message: str) -> None:
+    _progress_manager.error(task_id, error_message)
 
 
 def get_progress(task_id: str) -> Optional[Dict]:
-    with storage_lock:
-        if task_id not in progress_storage:
-            return None
-        
-        progress = progress_storage[task_id].copy()
-        cleanup_old_progress()
-        
-        return progress
-
-
-def cleanup_old_progress():
-    now = datetime.now()
-    expired_keys = [
-        task_id for task_id, data in progress_storage.items()
-        if now - data["created_at"] > PROGRESS_TTL
-    ]
-    for key in expired_keys:
-        del progress_storage[key]
+    return _progress_manager.get(task_id)
 

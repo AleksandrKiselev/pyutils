@@ -3,14 +3,12 @@ const navigation = {
         event.preventDefault();
         if (window.location.pathname === `/${path}`) return;
 
-        // Блокируем переключение папок, если идет генерация метаданных
         if (progressBar.taskId) {
             event.stopPropagation();
             toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
             return;
         }
 
-        // Закрываем полноэкранный режим при переключении папки
         if (DOM.fullscreenContainer.style.display === "flex") {
             fullscreen.close();
         }

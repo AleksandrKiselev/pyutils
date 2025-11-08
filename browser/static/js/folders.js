@@ -13,7 +13,7 @@ const folders = {
                 folders.rebindEventHandlers();
                 folders.updateActiveHighlight();
             } else {
-                console.error("❌ Папки не найдены в ответе");
+                console.error("Папки не найдены в ответе");
             }
         } catch (error) {
             console.error("Ошибка загрузки папок:", error);
@@ -27,7 +27,6 @@ const folders = {
             }
         });
         
-        // Восстанавливаем блокировку навигации, если идет генерация
         if (progressBar.taskId) {
             progressBar.blockNavigation();
         }
@@ -38,57 +37,37 @@ const folders = {
         document.querySelectorAll(".folder-tree a.active-folder")
             .forEach(el => el.classList.remove("active-folder"));
 
-        // Функция для нормализации пути (декодирование и нормализация)
         const normalizePath = (path) => {
             try {
-                // Убираем начальный слэш и декодируем
                 return decodeURIComponent(path.replace(/^\/+/, ''));
             } catch (e) {
                 return path.replace(/^\/+/, '');
             }
         };
         
-        // Нормализуем текущий путь
         const normalizedCurrent = normalizePath(currentPath);
+        let activeLink = document.querySelector(`.folder-tree a[href="${currentPath}"]`);
         
-        // Ищем активную ссылку - проверяем несколько вариантов
-        let activeLink = null;
-        
-        // Вариант 1: точное совпадение с текущим путем
-        activeLink = document.querySelector(`.folder-tree a[href="${currentPath}"]`);
-        
-        // Вариант 2: если не нашли, проверяем все ссылки
         if (!activeLink) {
             const allLinks = document.querySelectorAll(".folder-tree a");
             for (const link of allLinks) {
                 try {
-                    // Используем link.href для получения полного URL, затем извлекаем pathname
-                    // Это гарантирует правильное кодирование
                     let linkPath;
                     if (link.href.startsWith('http://') || link.href.startsWith('https://')) {
-                        const linkUrl = new URL(link.href);
-                        linkPath = linkUrl.pathname;
+                        linkPath = new URL(link.href).pathname;
                     } else {
-                        // Относительный путь - создаем полный URL
-                        const linkUrl = new URL(link.href, window.location.origin);
-                        linkPath = linkUrl.pathname;
+                        linkPath = new URL(link.href, window.location.origin).pathname;
                     }
                     
-                    // Сравниваем нормализованные пути
-                    const normalizedLink = normalizePath(linkPath);
-                    if (normalizedLink === normalizedCurrent) {
+                    if (normalizePath(linkPath) === normalizedCurrent) {
                         activeLink = link;
                         break;
                     }
                 } catch (e) {
-                    // Если не удалось создать URL, пробуем использовать getAttribute
                     const href = link.getAttribute("href");
-                    if (href) {
-                        const normalizedHref = normalizePath(href);
-                        if (normalizedHref === normalizedCurrent) {
-                            activeLink = link;
-                            break;
-                        }
+                    if (href && normalizePath(href) === normalizedCurrent) {
+                        activeLink = link;
+                        break;
                     }
                 }
             }
@@ -103,7 +82,6 @@ const folders = {
     toggle(event) {
         event.stopPropagation();
         
-        // Блокируем разворачивание папок во время генерации метаданных
         if (progressBar.taskId) {
             toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
             return;

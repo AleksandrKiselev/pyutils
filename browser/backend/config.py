@@ -1,10 +1,9 @@
-"""
-Управление конфигурацией для приложения просмотра изображений.
-"""
 import json
 import os
-from typing import Dict, Any
+import logging
+from typing import Dict, Any, Optional
 
+logger = logging.getLogger(__name__)
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
 DEFAULT_CONFIG: Dict[str, Any] = {
@@ -14,6 +13,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "items_per_page": 20,
     "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp", ".webm"]
 }
+
+_config: Optional["Config"] = None
 
 
 class Config(dict):
@@ -28,29 +29,35 @@ class Config(dict):
 
 
 def load_config() -> Config:
-    loaded_config = Config(DEFAULT_CONFIG.copy())
+    config = Config(DEFAULT_CONFIG.copy())
     
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                user_config = json.load(f)
-                loaded_config.update(user_config)
+                config.update(json.load(f))
         except Exception as e:
-            print(f"Предупреждение: Не удалось загрузить config.json: {e}")
+            logger.warning(f"Не удалось загрузить config.json: {e}")
     
-    loaded_config["image_folder"] = os.getenv("IMAGE_FOLDER", loaded_config["image_folder"])
-    loaded_config["favorites_folder"] = os.getenv("FAVORITES_FOLDER", loaded_config["favorites_folder"])
-    loaded_config["thumbnail_size"] = int(os.getenv("THUMBNAIL_SIZE", loaded_config["thumbnail_size"]))
-    loaded_config["items_per_page"] = int(os.getenv("ITEMS_PER_PAGE", loaded_config["items_per_page"]))
+    config["image_folder"] = os.getenv("IMAGE_FOLDER", config["image_folder"])
+    config["favorites_folder"] = os.getenv("FAVORITES_FOLDER", config["favorites_folder"])
+    config["thumbnail_size"] = int(os.getenv("THUMBNAIL_SIZE", config["thumbnail_size"]))
+    config["items_per_page"] = int(os.getenv("ITEMS_PER_PAGE", config["items_per_page"]))
     
-    loaded_config.IMAGE_FOLDER = os.path.abspath(loaded_config["image_folder"])
-    loaded_config.FAVORITES_FOLDER = os.path.abspath(loaded_config["favorites_folder"])
-    loaded_config.ALLOWED_EXTENSIONS = set(loaded_config["allowed_extensions"])
-    loaded_config.THUMBNAIL_SIZE = int(loaded_config["thumbnail_size"])
-    loaded_config.ITEMS_PER_PAGE = int(loaded_config["items_per_page"])
-    loaded_config.AUTO_TAGS = set(loaded_config.get("auto_tags", []))
+    config.IMAGE_FOLDER = os.path.abspath(config["image_folder"])
+    config.FAVORITES_FOLDER = os.path.abspath(config["favorites_folder"])
+    config.ALLOWED_EXTENSIONS = set(config["allowed_extensions"])
+    config.THUMBNAIL_SIZE = int(config["thumbnail_size"])
+    config.ITEMS_PER_PAGE = int(config["items_per_page"])
+    config.AUTO_TAGS = set(config.get("auto_tags", []))
     
-    return loaded_config
+    return config
 
 
-config = load_config()
+def get_config() -> Config:
+    global _config
+    if _config is None:
+        _config = load_config()
+    return _config
+
+
+config = get_config()

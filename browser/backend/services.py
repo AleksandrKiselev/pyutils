@@ -1,30 +1,40 @@
-"""
-Бизнес-логика сервисов для приложения просмотра изображений.
-"""
 import os
-import json
+import uuid
 import shutil
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor
 
-from paths import get_absolute_path, get_relative_path
-from paths import get_absolute_paths
-from paths import get_metadata_path, get_thumbnail_path  # Используются только для первичной инициализации
-from metadata import load_metadata, save_metadata
+from paths import get_absolute_path, get_relative_path, get_absolute_paths, get_metadata_path, get_thumbnail_path
+from metadata import metadata_store
 from image import collect_images, filter_images, sort_images
 from config import config
 
 logger = logging.getLogger(__name__)
 
+PARALLEL_THRESHOLD = 100
+MAX_WORKERS = 16
 
-def _get_filtered_images(folder_path: Optional[str], search: str):
-    images = collect_images(None if folder_path is None else folder_path)
+
+def _get_filtered_images(folder_path: Optional[str], search: str) -> List[Dict]:
+    images = collect_images(folder_path)
     return filter_images(images, search)
 
 
-def clear_caches():
-    load_metadata.cache_clear()
+def _get_metadata_or_raise(metadata_id: str) -> Dict:
+    metadata = metadata_store.get_by_id(metadata_id)
+    if not metadata:
+        raise FileNotFoundError(f"Метаданные с ID {metadata_id} не найдены")
+    return metadata
+
+
+def _process_images_parallel(images: List[Dict], processor: Callable[[Dict], int]) -> int:
+    if len(images) < PARALLEL_THRESHOLD:
+        return sum(processor(img) for img in images)
+    
+    max_workers = min(MAX_WORKERS, (os.cpu_count() or 1) * 2)
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        return sum(pool.map(processor, images))
 
 
 class ImageService:
@@ -36,115 +46,88 @@ class ImageService:
         return images[offset:offset + limit]
     
     @staticmethod
-    def delete_image(filename: str) -> None:
-        """Удаляет изображение и связанные файлы. Пути берутся из метаданных."""
-        base = get_absolute_path(filename)
-        mtime = os.path.getmtime(base)
-        metadata = load_metadata(base, mtime)
-        
-        _, thumb, meta = get_absolute_paths(metadata)
-        
-        os.remove(base)
-        os.remove(thumb)
-        os.remove(meta)
+    def delete_image(metadata_id: str) -> None:
+        metadata = _get_metadata_or_raise(metadata_id)
+        _, thumb, _ = get_absolute_paths(metadata)
+        os.remove(get_absolute_path(metadata["image_path"]))
+        if os.path.exists(thumb):
+            os.remove(thumb)
+        metadata_store.delete(metadata_id)
 
 
 class MetadataService:
     @staticmethod
-    def update_metadata(filenames: List[str], updates: Dict) -> None:
-        for filename in filenames:
-            image_path = get_absolute_path(filename)
-            mtime = os.path.getmtime(image_path)
-            metadata = load_metadata(image_path, mtime)
-            
-            for key in ("checked", "rating", "tags"):
-                if key in updates:
-                    metadata[key] = updates[key]
-                    
-            save_metadata(metadata)
+    def update_metadata(metadata_ids: List[str], updates: Dict) -> None:
+        allowed_keys = {"checked", "rating", "tags"}
+        metadata_updates = {key: updates[key] for key in allowed_keys if key in updates}
+        if not metadata_updates:
+            return
         
-        clear_caches()
+        for metadata_id in metadata_ids:
+            metadata = metadata_store.get_by_id(metadata_id)
+            if not metadata:
+                logger.warning(f"Метаданные с ID {metadata_id} не найдены")
+                continue
+            metadata_store.update(metadata_id, metadata_updates)
     
     @staticmethod
     def uncheck_all(folder_path: Optional[str], search: str) -> int:
         images = _get_filtered_images(folder_path, search)
         
-        def process_single(img):
-            filename = img.get("metadata", {}).get("image_path", "")
-            image_path = get_absolute_path(filename)
-            mtime = os.path.getmtime(image_path)
-            metadata = load_metadata(image_path, mtime)
+        def process_single(img: Dict) -> int:
+            metadata_id = img.get("id")
+            if not metadata_id:
+                return 0
             
-            if metadata.get("checked"):
-                metadata["checked"] = False
-                save_metadata(metadata)
-                return 1
-            return 0
+            metadata = metadata_store.get_by_id(metadata_id)
+            if not metadata or not metadata.get("checked"):
+                return 0
+            
+            metadata_store.update(metadata_id, {"checked": False})
+            return 1
         
-        if len(images) < 100:
-            count = sum(process_single(img) for img in images)
-        else:
-            max_workers = min(16, (os.cpu_count() or 1) * 2)
-            with ThreadPoolExecutor(max_workers=max_workers) as pool:
-                results = list(pool.map(process_single, images))
-                count = sum(results)
-        
-        clear_caches()
-        return count
+        return _process_images_parallel(images, process_single)
     
     @staticmethod
     def delete_metadata(folder_path: Optional[str], search: str) -> int:
         images = _get_filtered_images(folder_path, search)
         
-        def process_single(img):
-            filename = img.get("metadata", {}).get("image_path", "")
-            image_path = get_absolute_path(filename)
-            mtime = os.path.getmtime(image_path)
-            metadata = load_metadata(image_path, mtime)
-            
-            _, _, meta_path = get_absolute_paths(metadata)
-            os.remove(meta_path)
+        def process_single(img: Dict) -> int:
+            metadata_id = img.get("id")
+            if not metadata_id:
+                return 0
+            metadata_store.delete(metadata_id)
             return 1
         
-        count = sum(process_single(img) for img in images)
-        
-        clear_caches()
-        return count
+        return sum(process_single(img) for img in images)
 
 
 class FavoritesService:
     @staticmethod
-    def copy_to_favorites(filename: str) -> None:
-        src = get_absolute_path(filename)
-        dst_dir = config.FAVORITES_FOLDER
+    def copy_to_favorites(metadata_id: str) -> None:
+        metadata = _get_metadata_or_raise(metadata_id)
         
-        if not dst_dir:
+        if not config.FAVORITES_FOLDER:
             raise ValueError("В конфиге не указана папка избранного")
         
-        dst = os.path.join(dst_dir, os.path.basename(filename))
-        os.makedirs(dst_dir, exist_ok=True)
+        src = get_absolute_path(metadata["image_path"])
+        dst = os.path.join(config.FAVORITES_FOLDER, os.path.basename(metadata["image_path"]))
         
         if os.path.abspath(src) == os.path.abspath(dst):
             raise ValueError("Источник и назначение совпадают")
         
+        os.makedirs(config.FAVORITES_FOLDER, exist_ok=True)
         shutil.copy2(src, dst)
         
-        mtime = os.path.getmtime(src)
-        src_metadata = load_metadata(src, mtime)
-        _, _, src_meta = get_absolute_paths(src_metadata)
-        dst_meta = get_metadata_path(dst)
+        new_metadata = metadata.copy()
+        new_metadata["image_path"] = get_relative_path(dst)
+        new_metadata["meta_path"] = get_relative_path(get_metadata_path(dst))
+        new_metadata["thumb_path"] = get_relative_path(get_thumbnail_path(dst))
+        new_metadata["id"] = str(uuid.uuid4())
         
-        with open(src_meta, "r", encoding="utf-8") as f:
-            meta = json.load(f)
-        
-        meta["image_path"] = get_relative_path(dst)
-        meta["metadata_path"] = get_relative_path(dst_meta)
-        meta["thumbnail_path"] = get_relative_path(get_thumbnail_path(dst))
-        
-        tags = set(meta["tags"])
+        tags = set(new_metadata.get("tags", []))
         tags.add("favorite")
-        meta["tags"] = sorted(tags)
+        new_metadata["tags"] = sorted(tags)
         
-        with open(dst_meta, "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False, indent=2)
+        metadata_store.save(new_metadata)
 

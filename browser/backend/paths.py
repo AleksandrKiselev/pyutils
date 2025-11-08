@@ -1,11 +1,8 @@
-"""
-Утилиты для операций с файлами и папками.
-"""
 import os
 import hashlib
 import logging
 from functools import lru_cache
-from typing import Dict, Any, Iterator, Optional, Tuple
+from typing import Dict, Any, Iterator, Optional, Tuple, List
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -18,21 +15,13 @@ def _get_filename_hash(image_path: str) -> str:
 
 
 def get_metadata_file_path(image_path: str, ext: str) -> str:
-    try:
-        rel_path = get_relative_path(image_path)
-        rel_dir = os.path.dirname(rel_path)
-        meta_base = os.path.join(config.IMAGE_FOLDER, ".metadata")
-        meta_dir = os.path.join(meta_base, rel_dir)
-        os.makedirs(meta_dir, exist_ok=True)
-
-        # Формируем уникальное имя файла метаданных на основе хеша от имени файла (с расширением)
-        filename_hash = _get_filename_hash(image_path)
-        new_filename = f"{filename_hash}{ext}"
-
-        return os.path.join(meta_dir, new_filename)
-    except OSError as e:
-        logger.error(f"Ошибка создания директории метаданных для {image_path}: {e}")
-        raise OSError(f"Не удалось создать директорию метаданных: {e}") from e
+    rel_path = get_relative_path(image_path)
+    rel_dir = os.path.dirname(rel_path)
+    meta_dir = os.path.join(config.IMAGE_FOLDER, ".metadata", rel_dir)
+    os.makedirs(meta_dir, exist_ok=True)
+    
+    filename_hash = _get_filename_hash(image_path)
+    return os.path.join(meta_dir, f"{filename_hash}{ext}")
 
 
 def get_metadata_path(image_path: str) -> str:
@@ -44,9 +33,6 @@ def get_thumbnail_path(image_path: str) -> str:
 
 
 def get_absolute_path(relative_path: str, root_folder: Optional[str] = None) -> str:
-    """
-    Преобразует относительный путь в абсолютный.
-    """
     if root_folder is None:
         root_folder = config.IMAGE_FOLDER
     
@@ -56,48 +42,32 @@ def get_absolute_path(relative_path: str, root_folder: Optional[str] = None) -> 
     return os.path.normpath(os.path.join(root_folder, relative_path))
 
 
-def get_image_paths(folder=None):
+def get_image_paths(folder: Optional[str] = None) -> List[str]:
     if folder:
         if not os.path.isdir(folder):
             logger.warning(f"Указанный путь не является директорией: {folder}")
             return []
-        paths = []
+        
         try:
             with os.scandir(folder) as entries:
-                for entry in entries:
-                    if entry.is_file():
-                        ext = os.path.splitext(entry.name)[1].lower()
-                        if ext in config.ALLOWED_EXTENSIONS:
-                            paths.append(entry.path)
+                return [
+                    entry.path for entry in entries
+                    if entry.is_file() and os.path.splitext(entry.name)[1].lower() in config.ALLOWED_EXTENSIONS
+                ]
         except OSError as e:
             logger.warning(f"Ошибка чтения директории {folder}: {e}")
-        return paths
-    else:
-        return list(walk_images())
+            return []
+    
+    return list(walk_images())
 
 
 def get_absolute_paths(metadata: Dict[str, Any], root_folder: Optional[str] = None) -> Tuple[str, str, str]:
-    """
-    Получает все абсолютные пути из метаданных.
-    Возвращает кортеж (image_path, thumbnail_path, metadata_path).
-    """
-    image_path = metadata.get("image_path", "")
-    if not image_path:
-        raise ValueError("Путь к изображению не найден в метаданных")
+    required_keys = ["image_path", "thumb_path", "meta_path"]
+    missing = [key for key in required_keys if not metadata.get(key)]
+    if missing:
+        raise ValueError(f"В метаданных отсутствуют пути: {', '.join(missing)}")
     
-    thumbnail_path = metadata.get("thumbnail_path", "")
-    if not thumbnail_path:
-        raise ValueError("Путь к миниатюре не найден в метаданных")
-    
-    metadata_path = metadata.get("metadata_path", "")
-    if not metadata_path:
-        raise ValueError("Путь к метаданным не найден в метаданных")
-    
-    return (
-        get_absolute_path(image_path, root_folder),
-        get_absolute_path(thumbnail_path, root_folder),
-        get_absolute_path(metadata_path, root_folder)
-    )
+    return tuple(get_absolute_path(metadata[key], root_folder) for key in required_keys)
 
 
 def get_relative_path(absolute_path: str, root_folder: Optional[str] = None) -> str:
@@ -129,38 +99,39 @@ def walk_images(root_folder: Optional[str] = None) -> Iterator[str]:
         raise OSError(f"Не удалось обойти дерево директорий: {e}") from e
 
 
+def _count_images_in_dir(dir_path: str) -> int:
+    try:
+        return sum(
+            1 for entry in os.scandir(dir_path)
+            if entry.is_file() and os.path.splitext(entry.name)[1].lower() in config.ALLOWED_EXTENSIONS
+        )
+    except OSError as e:
+        logger.warning(f"Ошибка подсчета изображений в {dir_path}: {e}")
+        return 0
+
+
 def build_folder_tree(base_path: str, relative: str = "") -> Dict[str, Any]:
     tree: Dict[str, Any] = {}
     full_path = os.path.join(base_path, relative)
 
     try:
         for entry in os.scandir(full_path):
-            if entry.is_dir():
-                if entry.name.startswith("."):
-                    continue
-                rel_path = os.path.join(relative, entry.name).replace("\\", "/")
-                
-                try:
-                    image_count = sum(
-                        1 for f in os.listdir(entry.path)
-                        if os.path.isfile(os.path.join(entry.path, f)) and
-                           os.path.splitext(f)[1].lower() in config.ALLOWED_EXTENSIONS
-                    )
-                except OSError as e:
-                    logger.warning(f"Ошибка подсчета изображений в {entry.path}: {e}")
-                    image_count = 0
-                
-                children = build_folder_tree(base_path, rel_path)
-                
-                if image_count > 0 or children:
-                    tree[rel_path] = {
-                        "name": entry.name,
-                        "count": image_count,
-                        "children": children
-                    }
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+            
+            rel_path = os.path.join(relative, entry.name).replace("\\", "/")
+            image_count = _count_images_in_dir(entry.path)
+            children = build_folder_tree(base_path, rel_path)
+            
+            if image_count > 0 or children:
+                tree[rel_path] = {
+                    "name": entry.name,
+                    "count": image_count,
+                    "children": children
+                }
     except OSError as e:
         logger.error(f"Ошибка построения дерева папок для {full_path}: {e}")
-        raise OSError(f"Не удалось построить дерево папок: {e}") from e
+        raise
     
     return tree
 

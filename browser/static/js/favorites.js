@@ -1,10 +1,10 @@
 const favorites = {
-    async copy(event, filename) {
+    async copy(event, metadataId) {
         event.stopPropagation();
 
         try {
             const result = await utils.apiRequest("/copy_to_favorites", {
-                body: JSON.stringify({ filename })
+                body: JSON.stringify({ id: metadataId })
             });
 
             if (result.success) {
@@ -19,8 +19,8 @@ const favorites = {
     copyFromFullscreen() {
         const data = state.currentImages[state.currentIndex];
         if (!data) return;
-        const imagePath = data.metadata?.image_path || "";
-        favorites.copy({ stopPropagation: () => { } }, imagePath);
+        const metadataId = data?.id || "";
+        favorites.copy({ stopPropagation: () => { } }, metadataId);
     }
 };
 

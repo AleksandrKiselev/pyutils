@@ -1,6 +1,3 @@
-"""
-Извлечение, нормализация и управление тегами.
-"""
 import os
 import logging
 import re
@@ -39,7 +36,6 @@ def get_image_tags(image_path: str) -> Set[str]:
 
 
 def extract_tags_from_prompt(image_path: str, prompt: str, threshold: float = 0.9) -> List[str]:
-    """Извлекает теги из промпта и изображения. При ошибке возвращает пустой список."""
     try:
         prompt_tags = set()
         if prompt:
