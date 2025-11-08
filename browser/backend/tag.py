@@ -3,9 +3,11 @@ import logging
 import re
 import unicodedata
 from typing import Set, List
+
 from rapidfuzz import fuzz
-from config import config
 from PIL import Image
+
+from config import config
 
 logger = logging.getLogger(__name__)
 

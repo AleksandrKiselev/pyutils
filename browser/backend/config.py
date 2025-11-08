@@ -23,33 +23,33 @@ class Config(dict):
             return self[name]
         except KeyError:
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
-    
+
     def __setattr__(self, name: str, value: Any) -> None:
         self[name] = value
 
 
 def load_config() -> Config:
     config = Config(DEFAULT_CONFIG.copy())
-    
+
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 config.update(json.load(f))
         except Exception as e:
             logger.warning(f"Не удалось загрузить config.json: {e}")
-    
+
     config["image_folder"] = os.getenv("IMAGE_FOLDER", config["image_folder"])
     config["favorites_folder"] = os.getenv("FAVORITES_FOLDER", config["favorites_folder"])
     config["thumbnail_size"] = int(os.getenv("THUMBNAIL_SIZE", config["thumbnail_size"]))
     config["items_per_page"] = int(os.getenv("ITEMS_PER_PAGE", config["items_per_page"]))
-    
+
     config.IMAGE_FOLDER = os.path.abspath(config["image_folder"])
     config.FAVORITES_FOLDER = os.path.abspath(config["favorites_folder"])
     config.ALLOWED_EXTENSIONS = set(config["allowed_extensions"])
     config.THUMBNAIL_SIZE = int(config["thumbnail_size"])
     config.ITEMS_PER_PAGE = int(config["items_per_page"])
     config.AUTO_TAGS = set(config.get("auto_tags", []))
-    
+
     return config
 
 

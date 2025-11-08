@@ -11,7 +11,7 @@ from flask import Blueprint, request, jsonify, render_template, send_from_direct
 from config import config
 from paths import build_folder_tree, get_absolute_path
 from services import ImageService, MetadataService, FavoritesService
-from progress import create_progress_task, update_progress, complete_progress, error_progress, get_progress
+from progress import progress_manager
 from image import collect_images, needs_processing
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,15 @@ def _parse_search_scope(raw_search: str, folder_path: str):
     if raw_search.lower().startswith("g:"):
         return None, raw_search[2:].strip()
     return folder_path, raw_search
+
+
+def _get_validated_path_and_search(data):
+    subpath = data.get("path", "")
+    if subpath:
+        subpath = unquote(subpath)
+    folder_path = _get_validated_folder_path(subpath)
+    search_folder_path, search = _parse_search_scope(data.get("search", ""), folder_path)
+    return search_folder_path, search
 
 
 def handle_route_errors(f):
@@ -92,7 +101,7 @@ def index(subpath: str = ""):
     folder_path = get_absolute_path(subpath)
     if not os.path.isdir(folder_path):
         raise FileNotFoundError("Путь не существует")
-    
+
     return render_template(
         "index.html",
         folder_tree=build_folder_tree(config.IMAGE_FOLDER)
@@ -105,18 +114,18 @@ def get_images(subpath: str = ""):
     folder_path = get_absolute_path(subpath)
     if not os.path.isdir(folder_path):
         raise FileNotFoundError("Путь не существует")
-    
+
     try:
         limit = int(request.args.get("limit") or config.ITEMS_PER_PAGE)
         offset = int(request.args.get("offset") or 0)
     except ValueError:
         raise ValueError("Неверные параметры пагинации")
-    
+
     if limit < 1 or limit > 1000:
         raise ValueError("Лимит должен быть от 1 до 1000")
     if offset < 0:
         raise ValueError("Смещение должно быть неотрицательным")
-    
+
     sort_by = request.args.get("sort_by", "date")
     order = request.args.get("order", "asc")
     valid_sort_fields = {"date", "filename", "prompt", "rating", "tags", "size", "hash"}
@@ -125,9 +134,9 @@ def get_images(subpath: str = ""):
         raise ValueError(f"Неверное sort_by: {sort_by}")
     if order not in valid_orders:
         raise ValueError(f"Неверный order: {order}")
-    
+
     search_folder_path, search = _parse_search_scope(request.args.get("search", ""), folder_path)
-    
+
     images = ImageService.get_images(
         folder_path=search_folder_path,
         search=search,
@@ -136,7 +145,7 @@ def get_images(subpath: str = ""):
         limit=limit,
         offset=offset
     )
-    
+
     return jsonify(images)
 
 
@@ -147,10 +156,10 @@ def serve_file(filename: str):
     path = get_absolute_path(filename)
     if not os.path.exists(path):
         raise FileNotFoundError("Файл не найден")
-    
+
     if not os.path.abspath(path).startswith(os.path.abspath(config.IMAGE_FOLDER)):
         raise PermissionError("Доступ к файлу запрещен")
-    
+
     return send_from_directory(config.IMAGE_FOLDER, filename)
 
 
@@ -161,7 +170,7 @@ def delete_image():
     metadata_id = data.get("id")
     if not metadata_id or not isinstance(metadata_id, str):
         raise ValueError("ID метаданных обязательно и должно быть строкой")
-    
+
     ImageService.delete_image(metadata_id)
     return jsonify({"success": True})
 
@@ -170,19 +179,19 @@ def delete_image():
 @handle_route_errors
 def update_metadata():
     data = _validate_json_request()
-    
+
     metadata_ids = data.get("ids") or ([data.get("id")] if data.get("id") else [])
     if not metadata_ids or not isinstance(metadata_ids, list):
         raise ValueError("Не указаны ID метаданных")
-    
+
     metadata_ids = [id for id in metadata_ids if id]
     if not metadata_ids:
         raise ValueError("Не указаны ID метаданных")
-    
+
     updates = {key: data[key] for key in ("checked", "rating", "tags") if key in data}
     if not updates:
         raise ValueError("Нет полей метаданных для обновления")
-    
+
     MetadataService.update_metadata(metadata_ids, updates)
     return jsonify({"success": True})
 
@@ -194,18 +203,9 @@ def copy_to_favorites():
     metadata_id = data.get("id")
     if not metadata_id or not isinstance(metadata_id, str):
         raise ValueError("ID метаданных обязательно и должно быть строкой")
-    
+
     FavoritesService.copy_to_favorites(metadata_id)
     return jsonify({"success": True})
-
-
-def _get_validated_path_and_search(data):
-    subpath = data.get("path", "")
-    if subpath:
-        subpath = unquote(subpath)
-    folder_path = _get_validated_folder_path(subpath)
-    search_folder_path, search = _parse_search_scope(data.get("search", ""), folder_path)
-    return search_folder_path, search
 
 
 @routes.route("/uncheck_all", methods=["POST"])
@@ -238,11 +238,11 @@ def check_processing_needed():
 def progress_stream(task_id: str):
     def generate():
         while True:
-            progress = get_progress(task_id)
+            progress = progress_manager.get(task_id)
             if not progress:
                 yield f"data: {json.dumps({'error': 'Task not found'})}\n\n"
                 break
-            
+
             percentage = (progress["processed"] / progress["total"] * 100) if progress["total"] > 0 else 0
             progress_data = {
                 "processed": progress["processed"],
@@ -251,17 +251,17 @@ def progress_stream(task_id: str):
                 "message": progress["message"],
                 "percentage": percentage
             }
-            
+
             if progress.get("error"):
                 progress_data["error"] = progress["error"]
-            
+
             yield f"data: {json.dumps(progress_data)}\n\n"
-            
+
             if progress["status"] in ("completed", "error"):
                 break
-            
+
             time.sleep(0.5)
-    
+
     response = Response(generate(), mimetype="text/event-stream")
     response.headers["Cache-Control"] = "no-cache"
     response.headers["X-Accel-Buffering"] = "no"
@@ -273,17 +273,17 @@ def progress_stream(task_id: str):
 def process_images():
     data = _validate_json_request()
     folder_path = _get_validated_folder_path(data.get("path", ""))
-    task_id = create_progress_task()
-    
+    task_id = progress_manager.create_task()
+
     def process_task():
         try:
             def progress_callback(processed, total, message):
-                update_progress(task_id, processed, total, message)
+                progress_manager.update(task_id, processed, total, message)
             collect_images(folder=folder_path, progress_callback=progress_callback)
-            complete_progress(task_id, "Обработка завершена")
+            progress_manager.complete(task_id, "Обработка завершена")
         except Exception as e:
             logger.exception(f"Ошибка обработки изображений: {e}")
-            error_progress(task_id, str(e))
-    
+            progress_manager.error(task_id, str(e))
+
     threading.Thread(target=process_task, daemon=True).start()
     return jsonify({"success": True, "task_id": task_id})

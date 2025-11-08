@@ -22,27 +22,6 @@ DEFAULT_PORT = 5000
 BROWSER_URL = "http://127.0.0.1:5000"
 
 
-def create_app() -> Flask:
-    app = Flask(
-        __name__,
-        static_folder=os.path.join(BASE_DIR, "static"),
-        template_folder=os.path.join(BASE_DIR, "templates")
-    )
-    app.register_blueprint(routes)
-    app.config.update(load_config())
-    
-    @app.errorhandler(404)
-    def handle_not_found(error):
-        return jsonify({"error": "Не найдено"}), 404
-    
-    @app.errorhandler(500)
-    def handle_internal_error(error):
-        logger.exception("Внутренняя ошибка сервера")
-        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
-    
-    return app
-
-
 def _is_debug_mode() -> bool:
     return (
         os.getenv("FLASK_DEBUG", "False").lower() == "true" or
@@ -62,16 +41,37 @@ def open_browser() -> None:
         logger.warning(f"Не удалось открыть браузер: {e}")
 
 
+def create_app() -> Flask:
+    app = Flask(
+        __name__,
+        static_folder=os.path.join(BASE_DIR, "static"),
+        template_folder=os.path.join(BASE_DIR, "templates")
+    )
+    app.register_blueprint(routes)
+    app.config.update(load_config())
+
+    @app.errorhandler(404)
+    def handle_not_found(error):
+        return jsonify({"error": "Не найдено"}), 404
+
+    @app.errorhandler(500)
+    def handle_internal_error(error):
+        logger.exception("Внутренняя ошибка сервера")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
+
+    return app
+
+
 app = create_app()
 metadata_store.initialize()
 
 
 if __name__ == "__main__":
     debug_mode = _is_debug_mode()
-    
+
     if _should_open_browser(debug_mode):
         threading.Thread(target=open_browser, daemon=True).start()
-    
+
     app.run(
         host=os.getenv("FLASK_HOST", DEFAULT_HOST),
         port=int(os.getenv("FLASK_PORT", str(DEFAULT_PORT))),
