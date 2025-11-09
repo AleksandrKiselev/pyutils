@@ -1,5 +1,7 @@
 const ui = {
     changeSort() {
+        if (!DOM.sortSelect) return;
+        
         if (progressBar.taskId) {
             toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
             DOM.sortSelect.value = state.sortBy;

@@ -2,11 +2,35 @@ const fullscreen = {
     open(index) {
         state.currentIndex = index;
         fullscreen.updateView();
-        DOM.fullscreenContainer.style.display = "flex";
+        if (DOM.fullscreenContainer) DOM.fullscreenContainer.style.display = "flex";
+        fullscreen.setupImageClickHandler();
+    },
+
+    setupImageClickHandler() {
+        if (!DOM.fullscreenImg) return;
+        
+        // Удаляем старый обработчик, если есть
+        DOM.fullscreenImg.onclick = null;
+        
+        // Добавляем новый обработчик
+        DOM.fullscreenImg.onclick = function(e) {
+            // Проверяем, что клик был именно на изображении, а не на элементах управления
+            const target = e.target;
+            const isControlElement = target.closest('.fullscreen-buttons') || 
+                                   target.closest('.fullscreen-rating') ||
+                                   target.closest('.nav-arrow') ||
+                                   target.closest('.fullscreen-prompt') ||
+                                   target.closest('.fullscreen-tags-overlay') ||
+                                   target.closest('.fullscreen-filename');
+            
+            if (!isControlElement && target === DOM.fullscreenImg) {
+                fullscreen.close();
+            }
+        };
     },
 
     close() {
-        DOM.fullscreenContainer.style.display = "none";
+        if (DOM.fullscreenContainer) DOM.fullscreenContainer.style.display = "none";
     },
 
     updateView() {
@@ -16,24 +40,29 @@ const fullscreen = {
         const imagePath = data?.image_path || "";
         const metadataId = data?.id || "";
 
-        DOM.fullscreenImg.src = `/serve_image/${imagePath}`;
+        if (DOM.fullscreenImg) DOM.fullscreenImg.src = `/serve_image/${imagePath}`;
 
-        DOM.fullscreenPrompt.dataset.prompt = data.prompt;
-        DOM.fullscreenPrompt.textContent = data.prompt || "";
+        if (DOM.fullscreenPrompt) {
+            DOM.fullscreenPrompt.dataset.prompt = data.prompt;
+            DOM.fullscreenPrompt.textContent = data.prompt || "";
+        }
 
         const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
-        DOM.fullscreenFilename.innerHTML = `${filenameOnly} <span class="file-size">${utils.formatFileSize(data.size || 0)}</span>`;
+        if (DOM.fullscreenFilename) {
+            DOM.fullscreenFilename.innerHTML = `<span class="filename-text">${filenameOnly}</span> <span class="file-size">${utils.formatFileSize(data.size || 0)}</span>`;
+        }
 
         const miniCheckbox = document.querySelector(`.image-checkbox[data-id="${metadataId}"]`);
         const isChecked = miniCheckbox ? miniCheckbox.checked : !!data.checked;
 
-        DOM.fullscreenCheckbox.dataset.id = metadataId;
-        DOM.fullscreenCheckbox.checked = isChecked;
+        if (DOM.fullscreenCheckbox) {
+            DOM.fullscreenCheckbox.dataset.id = metadataId;
+            DOM.fullscreenCheckbox.checked = isChecked;
+        }
 
         const wrapper = document.querySelector(".fullscreen-image-wrapper");
         wrapper?.classList.toggle("checked", isChecked);
 
-        DOM.fullscreenTagsDisplay.innerHTML = "";
         tags.renderPills(data.tags || []);
 
         fullscreen.setupCheckboxHandler(data, miniCheckbox, wrapper);
@@ -41,6 +70,8 @@ const fullscreen = {
     },
 
     setupCheckboxHandler(data, miniCheckbox, wrapper) {
+        if (!DOM.fullscreenCheckbox) return;
+        
         DOM.fullscreenCheckbox.onchange = function () {
             const checked = DOM.fullscreenCheckbox.checked;
             data.checked = checked;
@@ -64,6 +95,7 @@ const fullscreen = {
     setupRatingHandler(data) {
         if (!DOM.fullscreenRating) return;
 
+        const metadataId = data?.id || "";
         const stars = DOM.fullscreenRating.querySelectorAll(".star");
         const currentRating = data.rating || 0;
 
@@ -80,7 +112,7 @@ const fullscreen = {
 
                 data.rating = newRating;
 
-                const img = utils.findImageById(data?.id || "");
+                const img = utils.findImageById(metadataId);
                 if (img) img.rating = newRating;
 
                 stars.forEach(s => {
@@ -149,6 +181,7 @@ const fullscreen = {
     },
 
     copyPrompt() {
+        if (!DOM.fullscreenPrompt) return;
         const prompt = DOM.fullscreenPrompt.dataset.prompt;
         if (prompt) {
             navigator.clipboard.writeText(prompt).then(() => {

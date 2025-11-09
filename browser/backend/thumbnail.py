@@ -11,7 +11,6 @@ import cv2
 
 from paths import get_absolute_paths
 from config import config
-from metadata import metadata_store
 
 logger = logging.getLogger(__name__)
 
@@ -78,26 +77,19 @@ class ThumbnailService:
         return False
 
     @staticmethod
-    def ensure_thumbnail(metadata: Dict[str, Any]) -> Dict[str, Any]:
-        if ThumbnailService.needs_thumbnail(metadata):
-            if ThumbnailService.create_thumbnail(metadata):
-                metadata_id = metadata.get("id")
-                if metadata_id:
-                    metadata_store.update(metadata_id, {"thumb_path": metadata["thumb_path"]})
-
-        return metadata
-
-    @staticmethod
-    def ensure_thumbnails_batch(metadata_list: List[Dict[str, Any]], max_workers: int = None) -> None:
+    def ensure_thumbnails(metadata_list: List[Dict[str, Any]]) -> None:
+        """Обеспечивает наличие миниатюр для списка метаданных"""
         if not metadata_list:
             return
 
-        if max_workers is None:
-            max_workers = min(8, (os.cpu_count() or 1) * 2, len(metadata_list))
-
         def process_single(metadata: Dict[str, Any]) -> None:
-            ThumbnailService.ensure_thumbnail(metadata)
+            if ThumbnailService.needs_thumbnail(metadata):
+                ThumbnailService.create_thumbnail(metadata)
 
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            pool.map(process_single, metadata_list)
+        if len(metadata_list) == 1:
+            process_single(metadata_list[0])
+        else:
+            max_workers = min(8, (os.cpu_count() or 1) * 2, len(metadata_list))
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                pool.map(process_single, metadata_list)
 

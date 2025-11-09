@@ -46,7 +46,12 @@ const progressBar = {
             return;
         }
 
-        if (DOM.progressMessage) DOM.progressMessage.textContent = message || "Обработка изображений…";
+        // Показываем прогресс-бар только для долгих операций (total >= 10)
+        if (total >= 10 && DOM.progressContainer?.classList.contains("hidden")) {
+            this.show();
+        }
+
+        if (DOM.progressMessage) DOM.progressMessage.textContent = message || "";
         if (DOM.progressText) DOM.progressText.textContent = `${processed} / ${total}`;
         if (DOM.progressPercentage) DOM.progressPercentage.textContent = `${Math.round(percentage)}%`;
         if (DOM.progressBar) DOM.progressBar.style.width = `${percentage}%`;
@@ -56,7 +61,6 @@ const progressBar = {
                 if (DOM.progressBar) DOM.progressBar.style.width = "100%";
                 if (DOM.progressPercentage) DOM.progressPercentage.textContent = "100%";
                 if (DOM.progressText) DOM.progressText.textContent = `${total} / ${total}`;
-                if (DOM.progressMessage) DOM.progressMessage.textContent = "Обработка завершена успешно";
             }
             
             this.disconnect();

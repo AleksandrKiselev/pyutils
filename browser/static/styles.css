@@ -382,6 +382,13 @@ body.sidebar-visible .sidebar {
 #search-box {
     width: 100%;
     max-width: 100%;
+    cursor: help;
+    position: relative;
+}
+
+/* Tooltip styling hint - нативные tooltip'ы браузера ограничены в стилизации */
+#search-box[title]:hover {
+    cursor: help;
 }
 
 .sort-container select {
@@ -577,17 +584,27 @@ body.sidebar-visible .sidebar {
     opacity: var(--opacity-idle);
     transition: opacity var(--transition-base);
     max-width: calc(100% - var(--spacing-md) * 2);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     z-index: 2;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
     line-height: 1.2;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-width: 0;
+}
+
+.image-filename .filename-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .image-filename .file-size {
     opacity: 0.7;
-    margin-left: var(--spacing-sm);
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .image-container:hover .image-filename {
@@ -1021,15 +1038,25 @@ body.sidebar-visible .sidebar {
     transition: opacity var(--transition-base);
     z-index: calc(var(--z-fullscreen-controls) + 1);
     max-width: calc(100% - var(--spacing-xl) * 2);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-width: 0;
+}
+
+.fullscreen-filename .filename-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .fullscreen-filename .file-size {
     opacity: 0.7;
-    margin-left: var(--spacing-sm);
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .fullscreen-image-wrapper:hover .fullscreen-filename {

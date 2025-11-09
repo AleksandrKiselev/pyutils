@@ -1,5 +1,6 @@
 const tags = {
     renderPills(tags) {
+        if (!DOM.fullscreenTagsDisplay) return;
         DOM.fullscreenTagsDisplay.innerHTML = "";
 
         tags.forEach(tag => {
@@ -7,8 +8,10 @@ const tags = {
             span.className = "tag-pill";
             span.textContent = tag;
             span.onclick = () => {
-                DOM.searchBox.value = `t:${tag}`;
-                gallery.filter();
+                if (DOM.searchBox) {
+                    DOM.searchBox.value = `t:${tag}`;
+                    gallery.filter();
+                }
                 fullscreen.close();
             };
             DOM.fullscreenTagsDisplay.appendChild(span);

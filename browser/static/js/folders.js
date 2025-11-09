@@ -1,5 +1,6 @@
 const folders = {
     async load() {
+        if (!DOM.sidebar) return;
         const folderList = DOM.sidebar.querySelector(".sidebar-folders");
         if (!folderList) return;
 

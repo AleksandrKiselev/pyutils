@@ -11,7 +11,6 @@ from metadata import metadata_store
 from image import collect_images, filter_images, sort_images
 from thumbnail import ThumbnailService
 from config import config
-from database import force_save
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class ImageService:
             images = sort_images(images, sort_by, order)
             page_images = images[offset:offset + limit]
         
-        ThumbnailService.ensure_thumbnails_batch(page_images)
+        ThumbnailService.ensure_thumbnails(page_images)
         
         return page_images
 
@@ -53,8 +52,7 @@ class ImageService:
         os.remove(get_absolute_path(metadata["image_path"]))
         if os.path.exists(thumb):
             os.remove(thumb)
-        metadata_store.delete(metadata_id)
-        force_save()
+        metadata_store.delete([metadata_id])
 
 
 class MetadataService:
@@ -66,10 +64,9 @@ class MetadataService:
             return
 
         batch_updates = [{"id": metadata_id, **metadata_updates} for metadata_id in metadata_ids]
-        updated_count = metadata_store.update_batch(batch_updates)
+        updated_count = metadata_store.update(batch_updates)
         if updated_count < len(metadata_ids):
             logger.warning(f"Обновлено {updated_count} из {len(metadata_ids)} метаданных")
-        force_save()
 
     @staticmethod
     def uncheck_all(folder_path: Optional[str], search: str) -> int:
@@ -81,8 +78,7 @@ class MetadataService:
         if not metadata_ids_to_update:
             return 0
         batch_updates = [{"id": metadata_id, "checked": False} for metadata_id in metadata_ids_to_update]
-        result = metadata_store.update_batch(batch_updates)
-        force_save()
+        result = metadata_store.update(batch_updates)
         return result
 
     @staticmethod
@@ -91,8 +87,7 @@ class MetadataService:
         metadata_ids = [img.get("id") for img in images if img.get("id")]
         if not metadata_ids:
             return 0
-        result = metadata_store.delete_batch(metadata_ids)
-        force_save()
+        result = metadata_store.delete(metadata_ids)
         return result
 
 
@@ -122,5 +117,4 @@ class FavoritesService:
         tags.add("favorite")
         new_metadata["tags"] = sorted(tags)
 
-        metadata_store.save(new_metadata)
-        force_save()
+        metadata_store.save([new_metadata])

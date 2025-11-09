@@ -9,7 +9,7 @@ const navigation = {
             return;
         }
 
-        if (DOM.fullscreenContainer.style.display === "flex") {
+        if (DOM.fullscreenContainer && DOM.fullscreenContainer.style.display === "flex") {
             fullscreen.close();
         }
 
@@ -21,7 +21,7 @@ const navigation = {
     },
 
     async loadContent() {
-        DOM.loading.style.display = "block";
+        if (DOM.loading) DOM.loading.style.display = "block";
         try {
             const path = window.location.pathname;
             stateManager.restore();
@@ -29,7 +29,7 @@ const navigation = {
         } catch (error) {
             console.error("Ошибка загрузки контента:", error);
         } finally {
-            DOM.loading.style.display = "none";
+            if (DOM.loading) DOM.loading.style.display = "none";
         }
     }
 };

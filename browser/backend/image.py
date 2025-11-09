@@ -1,15 +1,29 @@
 import os
 import random
 import logging
+import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from metadata import metadata_store
 from paths import get_absolute_path, get_image_paths
 from config import config
 
 logger = logging.getLogger(__name__)
+
+# Блокировки для предотвращения параллельного создания метаданных для одной папки
+_folder_locks: Dict[str, threading.Lock] = {}
+_locks_lock = threading.Lock()
+
+
+def _get_folder_lock(folder: Optional[str]) -> threading.Lock:
+    """Получает блокировку для конкретной папки. Для folder=None используется ключ ""."""
+    folder_key = folder or ""
+    with _locks_lock:
+        if folder_key not in _folder_locks:
+            _folder_locks[folder_key] = threading.Lock()
+        return _folder_locks[folder_key]
 
 
 def needs_processing(folder=None):
@@ -22,80 +36,50 @@ def needs_processing(folder=None):
 
 def collect_images(folder=None, progress_callback=None):
     image_paths = get_image_paths(folder)
-    total = len(image_paths)
-
-    if total == 0:
+    if len(image_paths) == 0:
         return []
-
-    if progress_callback:
-        progress_callback(0, total, f"Найдено {total} изображений")
-
-    BATCH_SIZE = 1000
+    
     results = []
-    new_images = []
     
-    logger.info(f"Начало загрузки метаданных для {total} изображений")
-    for i in range(0, total, BATCH_SIZE):
-        batch_paths = image_paths[i:i + BATCH_SIZE]
-        batch_metadata = metadata_store.get_batch(batch_paths)
-        
-        for idx, path in enumerate(batch_paths):
-            batch_idx = i + idx
-            if idx < len(batch_metadata) and batch_metadata[idx] is not None:
-                results.append((batch_idx, batch_metadata[idx]))
+    folder_lock = _get_folder_lock(folder)
+    with folder_lock:
+        existing_metadata = metadata_store.get_by_paths(image_paths)
+        new_images = []
+        for idx, (path, metadata) in enumerate(zip(image_paths, existing_metadata)):
+            if metadata is not None:
+                results.append((idx, metadata))
             else:
-                new_images.append((batch_idx, path))
-        
-        processed = min(i + len(batch_paths), total)
-        if progress_callback:
-            progress_callback(processed, total, f"Загрузка метаданных {processed}/{total}")
+                new_images.append((idx, path))
 
-    if new_images:
-        max_workers = min(32, (os.cpu_count() or 1) * 4, len(new_images))
-        new_metadata_list = []
-        
-        def create_metadata(original_idx: int, path: str) -> Optional[tuple]:
-            try:
-                metadata = metadata_store._create_metadata(path)
-                return (original_idx, metadata)
-            except Exception as e:
-                logger.error(f"Ошибка обработки изображения {path}: {e}")
-                return None
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {
-                pool.submit(create_metadata, original_idx, path): (original_idx, path)
-                for original_idx, path in new_images
-            }
+        if new_images:
+            max_workers = min(32, (os.cpu_count() or 1) * 4, len(new_images))
+            new_metadata_list = []
+            total = len(new_images)
+            processed_new = 0
             
-            logger.info(f"Начало создания метаданных для {len(new_images)} новых изображений")
-            for future in as_completed(futures):
-                original_idx, path = futures[future]
-                try:
-                    result = future.result()
-                    if result:
-                        idx, metadata = result
-                        results.append((idx, metadata))
-                        new_metadata_list.append(metadata)
-                    processed = len(results)
-                    if progress_callback:
-                        progress_callback(processed, total, f"Создание метаданных {processed}/{total}")
-                except Exception as e:
-                    logger.error(f"Ошибка обработки изображения {path}: {e}")
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futures = {
+                    pool.submit(metadata_store.create_metadata, path): (original_idx, path)
+                    for original_idx, path in new_images
+                }
+                
+                logger.info(f"Начало создания метаданных для {total} новых изображений")
+                for future in as_completed(futures):
+                    original_idx, path = futures[future]
+                    metadata = future.result()
+                    results.append((original_idx, metadata))
+                    new_metadata_list.append(metadata)
+                    processed_new += 1
+                    if progress_callback and total >= 10:
+                        progress_callback(processed_new, total, f"Создание метаданных {processed_new}/{total}")
+                
+                logger.info(f"Завершено создание метаданных для {len(new_metadata_list)} изображений")
             
-            logger.info(f"Завершено создание метаданных для {len(new_metadata_list)} изображений")
-        
-        if new_metadata_list:
-            metadata_store.save_batch(new_metadata_list)
-
-    results.sort(key=lambda x: x[0])
-    logger.info(f"Завершена загрузка метаданных для {len(results)} изображений")
+            if new_metadata_list:
+                metadata_store.save(new_metadata_list)
+                logger.info(f"Сохранено {len(new_metadata_list)} метаданных в БД")
     
-    # Финальный вызов прогресса - 100% завершено
-    if progress_callback:
-        progress_callback(total, total, f"Обработка завершена: {len(results)} изображений")
-    
-    return [metadata for _, metadata in results]
+    return [metadata for _, metadata in sorted(results)]
 
 
 def sort_images(images, sort_by, order):

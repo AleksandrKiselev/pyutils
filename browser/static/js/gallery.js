@@ -1,19 +1,19 @@
 const gallery = {
-    _filterTimeout: null, // Таймер для debounce фильтрации
-    
     async load() {
         state.loading = false;
-        const currentSortBy = DOM.sortSelect.value;
-        if (currentSortBy !== state.sortBy) {
-            state.sortBy = currentSortBy;
+        if (DOM.sortSelect) {
+            const currentSortBy = DOM.sortSelect.value;
+            if (currentSortBy !== state.sortBy) {
+                state.sortBy = currentSortBy;
+            }
         }
         
         const foldersPromise = folders.load();
         
         state.offset = 0;
         state.currentImages = [];
-        DOM.gallery.innerHTML = "";
-        if (DOM.loading.style.display === "block") {
+        if (DOM.gallery) DOM.gallery.innerHTML = "";
+        if (DOM.loading && DOM.loading.style.display === "block") {
             DOM.loading.style.display = "none";
         }
         
@@ -78,7 +78,7 @@ const gallery = {
             }
 
             progressBar.taskId = task_id;
-            progressBar.show();
+            // Не показываем прогресс-бар сразу, он покажется только при первом обновлении с total >= 10
             progressBar.connect();
         } catch (error) {
             console.error("Ошибка запуска обработки:", error);
@@ -121,7 +121,7 @@ const gallery = {
             const startIndex = state.currentImages.length;
             state.currentImages.push(...images);
             const cardsHTML = gallery.renderCards(images, startIndex);
-            DOM.gallery.insertAdjacentHTML("beforeend", cardsHTML);
+            if (DOM.gallery) DOM.gallery.insertAdjacentHTML("beforeend", cardsHTML);
 
             gallery.loadCheckboxState();
             images.forEach(img => {
@@ -135,7 +135,7 @@ const gallery = {
                 state.offset += images.length;
             }
 
-            const containers = DOM.gallery.querySelectorAll(".image-container:not(.image-loaded)");
+            const containers = DOM.gallery ? DOM.gallery.querySelectorAll(".image-container:not(.image-loaded)") : [];
             if (containers.length > 0) {
                 const preloadImages = () => {
                     Array.from(containers).forEach(container => {
@@ -217,42 +217,27 @@ const gallery = {
                     <img src="/serve_thumbnail/${thumbnailPath}" alt="Image" loading="lazy"
                          onload="this.parentElement.classList.add('image-loaded')"
                          onmouseenter="gallery.setHoveredPrompt('${prompt}')">
-                    <div class="image-filename">${filenameOnlyEscaped} <span class="file-size">${fileSizeFormatted}</span></div>
+                    <div class="image-filename"><span class="filename-text">${filenameOnlyEscaped}</span> <span class="file-size">${fileSizeFormatted}</span></div>
                 </div>`;
         }).join("");
     },
 
-    filter() {
+    async filter() {
         // Блокируем фильтрацию во время генерации метаданных
         if (progressBar.taskId) {
             toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
             return;
         }
         
-        // Очищаем предыдущий таймер
-        if (this._filterTimeout) {
-            clearTimeout(this._filterTimeout);
-        }
+        const searchBox = DOM.searchBox;
+        if (!searchBox) return;
         
-        this._filterTimeout = setTimeout(async () => {
-            const searchBox = DOM.searchBox;
-            const hadFocus = document.activeElement === searchBox;
-            const cursorPosition = hadFocus ? searchBox.selectionStart : null;
-            const searchValue = searchBox.value;
-            
-            state.searchQuery = searchValue.trim();
+        const searchValue = searchBox.value;
+        state.searchQuery = searchValue.trim();
+        if (DOM.sortSelect) {
             state.sortBy = DOM.sortSelect.value;
-            await gallery.load();
-            
-            if (hadFocus && cursorPosition !== null && DOM.searchBox && document.body.contains(DOM.searchBox)) {
-                requestAnimationFrame(() => {
-                    if (DOM.searchBox && document.body.contains(DOM.searchBox) && document.activeElement === DOM.searchBox) {
-                        const pos = Math.min(cursorPosition, DOM.searchBox.value.length);
-                        DOM.searchBox.setSelectionRange(pos, pos);
-                    }
-                });
-            }
-        }, 300);
+        }
+        await gallery.load();
     },
 
     async deleteThumbnail(event, metadataId) {

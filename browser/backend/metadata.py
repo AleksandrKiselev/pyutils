@@ -1,4 +1,3 @@
-import json
 import os
 import re
 import struct
@@ -13,53 +12,22 @@ from typing import Dict, Any, Optional, List
 from paths import get_relative_path, get_thumbnail_path
 from config import config
 from tag import extract_tags_from_prompt
-from database import get_connection, init_database, force_save
+from database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
 
 class MetadataStore:
-    def _row_to_dict(self, row) -> Dict[str, Any]:
-        if not row:
-            return {}
-        return {
-            "id": row["id"],
-            "prompt": row["prompt"] or "",
-            "checked": bool(row["checked"]),
-            "rating": row["rating"] or 0,
-            "tags": json.loads(row["tags"]) if row["tags"] else [],
-            "size": row["size"] or 0,
-            "hash": row["hash"] or "",
-            "image_path": row["image_path"],
-            "thumb_path": row["thumb_path"] or ""
-        }
-
-    def _dict_to_row(self, metadata: Dict[str, Any]) -> tuple:
-        return (
-            metadata.get("id"),
-            metadata.get("prompt", ""),
-            1 if metadata.get("checked", False) else 0,
-            metadata.get("rating", 0) or 0,
-            json.dumps(metadata.get("tags", []), ensure_ascii=False),
-            metadata.get("size", 0) or 0,
-            metadata.get("hash", ""),
-            metadata.get("image_path", ""),
-            metadata.get("thumb_path", "")
-        )
-
+    def __init__(self):
+        self._db_manager = DatabaseManager()
+    
+    def initialize(self) -> None:
+        self._db_manager.init_database()
+        atexit.register(self._db_manager.force_save)
+    
     def _load_from_db(self, image_path: str) -> Optional[Dict[str, Any]]:
         rel_image_path = get_relative_path(image_path)
-        
-        try:
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM metadata WHERE image_path = ?", (rel_image_path,))
-                row = cursor.fetchone()
-                if row:
-                    return self._row_to_dict(row)
-        except Exception as e:
-            logger.warning(f"Ошибка чтения метаданных из БД для {image_path}: {e}")
-        return None
+        return self._db_manager.get_by_image_path(rel_image_path)
 
     def _extract_prompt_from_image(self, image_path: str) -> str:
         try:
@@ -115,105 +83,90 @@ class MetadataStore:
         except Exception as e:
             logger.warning(f"Ошибка вычисления хеша для {image_path}: {e}")
             return ""
+    
+    def get_by_paths(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
+        """Получает существующие метаданные для списка путей изображений. Не создает новые."""
+        if not image_paths:
+            return []
+        rel_paths = [get_relative_path(path) for path in image_paths]
+        return self._db_manager.get_batch_by_paths(rel_paths)
+
+    def get_by_id(self, metadata_id: str) -> Optional[Dict[str, Any]]:
+        return self._db_manager.get_by_id(metadata_id)
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        return self._db_manager.get_all()
 
     def has_metadata(self, image_path: str) -> bool:
         rel_image_path = get_relative_path(image_path)
-        try:
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM metadata WHERE image_path = ?", (rel_image_path,))
-                row = cursor.fetchone()
-                return row[0] > 0 if row else False
-        except Exception as e:
-            logger.warning(f"Ошибка проверки метаданных для {image_path}: {e}")
-            return False
-
-    def save(self, metadata: Dict[str, Any]) -> None:
-        if not metadata.get("id"):
-            raise ValueError("ID метаданных не найден")
-
-        row_data = self._dict_to_row(metadata)
+        return self._db_manager.has_metadata(rel_image_path)
+    
+    def create_metadata(self, image_path: str) -> Dict[str, Any]:
+        prompt = ""
+        size = 0
+        file_hash = ""
+        rel_image_path = ""
+        rel_thumb_path = ""
+        tags = []
         
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT OR REPLACE INTO metadata 
-                (id, prompt, checked, rating, tags, size, hash, image_path, thumb_path, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, row_data)
-
-    def update(self, metadata_id: str, updates: Dict[str, Any]) -> None:
-        metadata = self.get_by_id(metadata_id)
-        if not metadata:
-            raise ValueError(f"Метаданные с ID {metadata_id} не найдены")
-        metadata.update(updates)
-        self.save(metadata)
-
-    def get_by_id(self, metadata_id: str) -> Optional[Dict[str, Any]]:
         try:
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM metadata WHERE id = ?", (metadata_id,))
-                row = cursor.fetchone()
-                if row:
-                    return self._row_to_dict(row)
+            prompt = self._extract_prompt_from_image(image_path)
         except Exception as e:
-            logger.warning(f"Ошибка получения метаданных по ID {metadata_id}: {e}")
-        return None
-
-    def get_all(self) -> List[Dict[str, Any]]:
-        try:
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM metadata")
-                rows = cursor.fetchall()
-                return [self._row_to_dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Ошибка получения всех метаданных: {e}")
-            return []
-
-    def get_batch(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
-        if not image_paths:
-            return []
+            logger.warning(f"Ошибка извлечения промпта из {image_path}: {e}")
         
-        rel_paths = [get_relative_path(path) for path in image_paths]
-        result: List[Optional[Dict[str, Any]]] = [None] * len(image_paths)
-        path_to_index = {rel_path: idx for idx, rel_path in enumerate(rel_paths)}
-        
-        placeholders = ",".join("?" * len(rel_paths))
         try:
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(f"SELECT * FROM metadata WHERE image_path IN ({placeholders})", rel_paths)
-                rows = cursor.fetchall()
-                for row in rows:
-                    metadata = self._row_to_dict(row)
-                    image_path = metadata.get("image_path")
-                    if image_path in path_to_index:
-                        result[path_to_index[image_path]] = metadata
+            size = os.path.getsize(image_path)
+        except (OSError, IOError) as e:
+            logger.warning(f"Ошибка получения размера файла {image_path}: {e}")
+        
+        try:
+            file_hash = self._calculate_file_hash(image_path)
         except Exception as e:
-            logger.warning(f"Ошибка batch чтения метаданных: {e}")
-        return result
-
-    def save_batch(self, metadata_list: List[Dict[str, Any]]) -> None:
+            logger.warning(f"Ошибка вычисления хеша для {image_path}: {e}")
+        
+        try:
+            rel_image_path = get_relative_path(image_path)
+        except Exception as e:
+            logger.warning(f"Ошибка получения относительного пути для {image_path}: {e}")
+        
+        try:
+            thumb_path = get_thumbnail_path(image_path)
+            if thumb_path:
+                rel_thumb_path = get_relative_path(thumb_path)
+        except Exception as e:
+            logger.warning(f"Ошибка получения пути миниатюры для {image_path}: {e}")
+        
+        try:
+            tags = extract_tags_from_prompt(image_path, prompt)
+        except Exception as e:
+            logger.warning(f"Ошибка извлечения тегов из {image_path}: {e}")
+        
+        return {
+            "prompt": prompt or "Метаданные не найдены",
+            "checked": False,
+            "rating": 0,
+            "tags": tags if isinstance(tags, list) else [],
+            "size": int(size) if size else 0,
+            "hash": file_hash or "",
+            "image_path": rel_image_path or "",
+            "thumb_path": rel_thumb_path or "",
+            "id": str(uuid.uuid4())
+        }
+    
+    def save(self, metadata_list: List[Dict[str, Any]]) -> None:
+        """Сохраняет метаданные. Принимает список метаданных для сохранения."""
         if not metadata_list:
             return
         
-        logger.info(f"Начало batch сохранения {len(metadata_list)} метаданных")
-        rows_data = [self._dict_to_row(metadata) for metadata in metadata_list]
-        
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.executemany("""
-                INSERT OR REPLACE INTO metadata 
-                (id, prompt, checked, rating, tags, size, hash, image_path, thumb_path, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, rows_data)
-        
-        logger.info(f"Завершено batch сохранение {len(metadata_list)} метаданных")
-        force_save()
-
-    def update_batch(self, updates: List[Dict[str, Any]]) -> int:
+        if len(metadata_list) == 1:
+            self._db_manager.save(metadata_list, force_save=False)
+        else:
+            logger.info(f"Начало batch сохранения {len(metadata_list)} метаданных")
+            self._db_manager.save(metadata_list, force_save=True)
+            logger.info(f"Завершено batch сохранение {len(metadata_list)} метаданных")
+    
+    def update(self, updates: List[Dict[str, Any]]) -> int:
+        """Обновляет метаданные. Принимает список обновлений вида [{"id": "...", "checked": True, ...}, ...]"""
         if not updates:
             return 0
         
@@ -222,19 +175,7 @@ class MetadataStore:
             return 0
         
         logger.info(f"Начало batch обновления {len(updates)} метаданных")
-        current_metadata = {}
-        placeholders = ",".join("?" * len(metadata_ids))
-        try:
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(f"SELECT * FROM metadata WHERE id IN ({placeholders})", metadata_ids)
-                rows = cursor.fetchall()
-                rows_list = [self._row_to_dict(row) for row in rows]
-                for metadata in rows_list:
-                    current_metadata[metadata["id"]] = metadata
-        except Exception as e:
-            logger.warning(f"Ошибка загрузки метаданных для batch update: {e}")
-            return 0
+        current_metadata = self._db_manager.get_batch_by_ids(metadata_ids)
         
         updated_metadata = []
         allowed_keys = {"checked", "rating", "tags"}
@@ -249,57 +190,16 @@ class MetadataStore:
             updated_metadata.append(metadata)
         
         if updated_metadata:
-            self.save_batch(updated_metadata)
+            self.save(updated_metadata)
         logger.info(f"Завершено batch обновление {len(updated_metadata)} метаданных")
         return len(updated_metadata)
-
-    def delete_batch(self, metadata_ids: List[str]) -> int:
+    
+    def delete(self, metadata_ids: List[str]) -> int:
+        """Удаляет метаданные. Принимает список ID для удаления. Принудительно сохраняет БД, так как это критическая операция."""
         if not metadata_ids:
             return 0
         
-        try:
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                placeholders = ",".join("?" * len(metadata_ids))
-                cursor.execute(f"DELETE FROM metadata WHERE id IN ({placeholders})", metadata_ids)
-                return cursor.rowcount
-        except Exception as e:
-            logger.error(f"Ошибка batch удаления метаданных: {e}")
-            raise
-
-    def _create_metadata(self, image_path: str) -> Dict[str, Any]:
-        prompt = self._extract_prompt_from_image(image_path)
-        return {
-            "prompt": prompt,
-            "checked": False,
-            "rating": 0,
-            "tags": extract_tags_from_prompt(image_path, prompt),
-            "size": os.path.getsize(image_path),
-            "hash": self._calculate_file_hash(image_path),
-            "image_path": get_relative_path(image_path),
-            "thumb_path": get_relative_path(get_thumbnail_path(image_path)),
-            "id": str(uuid.uuid4())
-        }
-
-    def get(self, image_path: str) -> Dict[str, Any]:
-        metadata = self._load_from_db(image_path)
-        if not metadata:
-            metadata = self._create_metadata(image_path)
-            self.save(metadata)
-        return metadata
-
-    def delete(self, metadata_id: str) -> None:
-        try:
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM metadata WHERE id = ?", (metadata_id,))
-        except Exception as e:
-            logger.error(f"Ошибка удаления метаданных {metadata_id}: {e}")
-            raise
-
-    def initialize(self) -> None:
-        init_database()
-        atexit.register(force_save)
+        return self._db_manager.delete(metadata_ids, force_save=True)
 
 
 metadata_store = MetadataStore()

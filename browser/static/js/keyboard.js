@@ -1,6 +1,6 @@
 const keyboard = {
     handleKeydown(e) {
-        const isFullscreen = DOM.fullscreenContainer.style.display === "flex";
+        const isFullscreen = DOM.fullscreenContainer && DOM.fullscreenContainer.style.display === "flex";
         const isSidebarVisible = document.body.classList.contains("sidebar-visible");
 
         if (e.key === "Escape" && isSidebarVisible && !isFullscreen) {

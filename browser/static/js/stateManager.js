@@ -1,11 +1,11 @@
 const stateManager = {
     save() {
-        const state = {
+        const savedState = {
             currentPath: window.location.pathname,
-            sortBy: DOM.sortSelect.value,
+            sortBy: DOM.sortSelect ? DOM.sortSelect.value : (state.sortBy || "date-desc"),
             sidebarVisible: document.body.classList.contains("sidebar-visible")
         };
-        localStorage.setItem("galleryState", JSON.stringify(state));
+        localStorage.setItem("galleryState", JSON.stringify(savedState));
         if (typeof folders !== "undefined" && folders.saveState) {
             folders.saveState();
         }
@@ -18,14 +18,14 @@ const stateManager = {
         try {
             const saved = JSON.parse(raw);
 
-            if (saved.sortBy) {
+            if (saved.sortBy && DOM.sortSelect) {
                 state.sortBy = saved.sortBy;
                 DOM.sortSelect.value = saved.sortBy;
-            } else {
+            } else if (DOM.sortSelect) {
                 state.sortBy = DOM.sortSelect.value;
             }
 
-            if (typeof saved.sidebarVisible === "boolean") {
+            if (typeof saved.sidebarVisible === "boolean" && DOM.sidebar) {
                 DOM.sidebar.classList.toggle("hidden", !saved.sidebarVisible);
                 document.body.classList.toggle("sidebar-visible", saved.sidebarVisible);
             }

@@ -44,9 +44,11 @@ window.onload = function () {
     });
 
     navigation.loadContent();
-    DOM.scrollToTop.classList.add("hidden");
+    if (DOM.scrollToTop) DOM.scrollToTop.classList.add("hidden");
 
-    DOM.menuToggle.addEventListener("click", ui.closeSidebar);
+    if (DOM.menuToggle) {
+        DOM.menuToggle.addEventListener("click", ui.closeSidebar);
+    }
     if (DOM.menuToggleFloating) {
         DOM.menuToggleFloating.addEventListener("click", ui.toggleSidebar);
     }
@@ -63,7 +65,9 @@ window.onload = function () {
         if (window.innerHeight + window.scrollY >= document.body.offsetHeight - SCROLL_THRESHOLD) {
             gallery.loadMore();
         }
-        DOM.scrollToTop.classList.toggle("hidden", window.scrollY <= SCROLL_TO_TOP_THRESHOLD);
+        if (DOM.scrollToTop) {
+            DOM.scrollToTop.classList.toggle("hidden", window.scrollY <= SCROLL_TO_TOP_THRESHOLD);
+        }
     });
 
     window.addEventListener("beforeunload", stateManager.save);
@@ -75,13 +79,24 @@ window.onload = function () {
         }
     });
 
+    if (DOM.searchBox) {
+        DOM.searchBox.addEventListener("keydown", e => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                gallery.filter();
+            }
+        });
+    }
+
     document.addEventListener("keydown", keyboard.handleKeydown);
 
-    DOM.fullscreenContainer.addEventListener("click", e => {
-        const isOutside = !e.target.closest(".fullscreen-image-wrapper")
-            && !e.target.closest(".nav-arrow");
-        if (isOutside) fullscreen.close();
-    });
+    if (DOM.fullscreenContainer) {
+        DOM.fullscreenContainer.addEventListener("click", e => {
+            const isOutside = !e.target.closest(".fullscreen-image-wrapper")
+                && !e.target.closest(".nav-arrow");
+            if (isOutside) fullscreen.close();
+        });
+    }
 };
 
 window.onpopstate = (event) => {
@@ -95,12 +110,12 @@ window.onpopstate = (event) => {
     }
 
     // Закрываем полноэкранный режим при переключении папки (назад/вперед)
-    if (DOM.fullscreenContainer.style.display === "flex") {
+    if (DOM.fullscreenContainer && DOM.fullscreenContainer.style.display === "flex") {
         fullscreen.close();
     }
     
     navigation.loadContent();
     gallery.loadCheckboxState();
-    DOM.scrollToTop.classList.add("hidden");
+    if (DOM.scrollToTop) DOM.scrollToTop.classList.add("hidden");
 };
 

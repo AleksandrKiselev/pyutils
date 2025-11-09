@@ -280,7 +280,7 @@ def process_images():
             def progress_callback(processed, total, message):
                 progress_manager.update(task_id, processed, total, message)
             collect_images(folder=folder_path, progress_callback=progress_callback)
-            progress_manager.complete(task_id, "Обработка завершена")
+            progress_manager.complete(task_id, "")
         except Exception as e:
             logger.exception(f"Ошибка обработки изображений: {e}")
             progress_manager.error(task_id, str(e))
