@@ -22,6 +22,20 @@ const utils = {
             .replace(/\t/g, "\\t");
     },
 
+    formatFileSize(bytes) {
+        if (bytes >= 1024 * 1024) {
+            return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+        }
+        if (bytes >= 1024) {
+            return (bytes / 1024).toFixed(2) + " KB";
+        }
+        return bytes + " B";
+    },
+
+    findImageById(metadataId) {
+        return state.currentImages.find(img => (img?.id || "") === metadataId);
+    },
+
     async apiRequest(endpoint, options = {}) {
         const defaultOptions = {
             method: "POST",
@@ -42,6 +56,11 @@ const utils = {
             console.error(`Ошибка API запроса: ${endpoint}`, error);
             throw error;
         }
+    },
+
+    showError(message, error) {
+        const errorMessage = error?.message || error?.toString() || "неизвестная ошибка";
+        toast.show(message + ": " + errorMessage, null, 5000);
     }
 };
 

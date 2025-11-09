@@ -20,7 +20,11 @@ const gallery = {
         await gallery.ensureMetadataGenerated();
         await foldersPromise;
         
-        await gallery.loadMore();
+        // Загружаем галерею только если обработка не запущена
+        // Если обработка запущена, галерея загрузится автоматически после завершения
+        if (!progressBar.taskId) {
+            await gallery.loadMore();
+        }
     },
 
     async ensureMetadataGenerated() {
@@ -179,12 +183,7 @@ const gallery = {
             const metadataIdAttrEscaped = metadataId ? metadataId.replace(/"/g, "&quot;").replace(/'/g, "&#39;") : "";
             const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
             const filenameOnlyEscaped = utils.escapeJS(filenameOnly);
-            const fileSize = img.size || 0;
-            const fileSizeFormatted = fileSize >= 1024 * 1024 
-                ? (fileSize / (1024 * 1024)).toFixed(2) + " MB"
-                : fileSize >= 1024
-                ? (fileSize / 1024).toFixed(2) + " KB"
-                : fileSize + " B";
+            const fileSizeFormatted = utils.formatFileSize(img.size || 0);
             const ratingValue = img.rating || 0;
 
             const tags = img.tags || [];
@@ -235,41 +234,23 @@ const gallery = {
             clearTimeout(this._filterTimeout);
         }
         
-        // Используем debounce для фильтрации (300ms задержка)
-        // Это предотвращает множественные вызовы gallery.load() при быстром вводе
         this._filterTimeout = setTimeout(async () => {
             const searchBox = DOM.searchBox;
-            
-            // Сохраняем фокус и позицию курсора перед загрузкой
             const hadFocus = document.activeElement === searchBox;
             const cursorPosition = hadFocus ? searchBox.selectionStart : null;
-            const searchValue = searchBox.value; // Сохраняем значение на случай если оно изменится
+            const searchValue = searchBox.value;
             
             state.searchQuery = searchValue.trim();
             state.sortBy = DOM.sortSelect.value;
-            
             await gallery.load();
             
-            // Восстанавливаем фокус и позицию курсора после загрузки только если поле все еще существует
             if (hadFocus && cursorPosition !== null && DOM.searchBox && document.body.contains(DOM.searchBox)) {
-                // Проверяем, что значение не изменилось пользователем во время загрузки
-                const currentValue = DOM.searchBox.value;
-                if (currentValue === searchValue || currentValue.startsWith(searchValue)) {
-                    // Используем один requestAnimationFrame для плавного восстановления
-                    requestAnimationFrame(() => {
-                        if (DOM.searchBox && document.body.contains(DOM.searchBox)) {
-                            // Восстанавливаем значение только если оно было изменено системой
-                            if (DOM.searchBox.value !== searchValue && DOM.searchBox.value !== currentValue) {
-                                DOM.searchBox.value = searchValue;
-                            }
-                            // Восстанавливаем позицию курсора только если поле все еще в фокусе
-                            if (document.activeElement === DOM.searchBox) {
-                                const finalCursorPosition = Math.min(cursorPosition, DOM.searchBox.value.length);
-                                DOM.searchBox.setSelectionRange(finalCursorPosition, finalCursorPosition);
-                            }
-                        }
-                    });
-                }
+                requestAnimationFrame(() => {
+                    if (DOM.searchBox && document.body.contains(DOM.searchBox) && document.activeElement === DOM.searchBox) {
+                        const pos = Math.min(cursorPosition, DOM.searchBox.value.length);
+                        DOM.searchBox.setSelectionRange(pos, pos);
+                    }
+                });
             }
         }, 300);
     },
@@ -286,10 +267,10 @@ const gallery = {
             if (result.success) {
                 event.target.closest(".image-container")?.remove();
             } else {
-                alert("Ошибка удаления: " + (result.error || "неизвестная"));
+                toast.show("Ошибка удаления: " + (result.error || "неизвестная"), null, 5000);
             }
         } catch (error) {
-            alert("Ошибка удаления: " + error);
+            utils.showError("Ошибка удаления", error);
         }
     },
 
@@ -302,12 +283,8 @@ const gallery = {
 
     loadCheckboxState() {
         document.querySelectorAll(".image-checkbox").forEach(cb => {
-            const metadataId = cb.dataset.id;
-            const img = state.currentImages.find(i => {
-                const id = i?.id || "";
-                return id === metadataId;
-            });
-            if (img) cb.checked = !!img?.checked;
+            const img = utils.findImageById(cb.dataset.id);
+            if (img) cb.checked = !!img.checked;
         });
         gallery.updateImageOpacity();
     },
@@ -350,9 +327,7 @@ const gallery = {
                 });
             }
         } catch (error) {
-            console.error("Ошибка сброса чекбоксов:", error);
-            const errorMessage = error.message || error.toString();
-            alert("Ошибка сброса чекбоксов: " + errorMessage);
+            utils.showError("Ошибка сброса чекбоксов", error);
         }
     },
 
@@ -376,15 +351,11 @@ const gallery = {
             });
 
             if (result.success) {
-                alert(`Удалено метаданных: ${result.count || 0}`);
-                // Перезагружаем галерею для обновления отображения
-                // ensureMetadataGenerated() будет вызван внутри gallery.load()
+                toast.show(`Удалено метаданных: ${result.count || 0}`, null, 3000);
                 gallery.load();
             }
         } catch (error) {
-            console.error("Ошибка удаления метаданных:", error);
-            const errorMessage = error.message || error.toString();
-            alert("Ошибка удаления метаданных: " + errorMessage);
+            utils.showError("Ошибка удаления метаданных", error);
         }
     },
 

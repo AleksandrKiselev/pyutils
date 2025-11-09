@@ -1,10 +1,7 @@
 const rating = {
     set(event, metadataId, ratingValue) {
         event.stopPropagation();
-        const img = state.currentImages.find(i => {
-            const id = i?.id || "";
-            return id === metadataId;
-        });
+        const img = utils.findImageById(metadataId);
         if (!img) return;
 
         const currentRating = img.rating || 0;

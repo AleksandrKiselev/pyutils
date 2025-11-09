@@ -5,50 +5,58 @@
     "items_per_page": 20,
     "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp", ".webm"],
     "auto_tags": [
-        "solo", "1girl", "2girls", "3girls", "1male", "2males", "3males", "1boy", "2boys", "3boys",
-        "multiple males", "group sex", "gangbang", "threesome", "orgy",
+        "1boy", "1girl", "1male", "2boys", "2girls", "2males", "3boys", "3girls", "3males",
+        "gangbang", "group sex", "multiple males", "orgy", "solo", "threesome",
 
-        "lying", "standing", "sitting", "kneeling", "squatting", "straddling", "on all fours",
-        "bent over", "arched back",
-        "legs spread", "legs together", "legs lift", "legs up", "legs rise", "one leg raised", "legs apart",
-        "ass up", "face down", "top-down bottom-up", "jack-o-pose",
+        "arched back", "arms behind back", "arms up", "ass up", "bent over", "face down", "jack-o-pose",
+        "kneeling", "legs apart", "legs lift", "legs spread", "legs together", "legs up", "legs rise",
+        "lying", "on all fours", "one leg raised", "sitting", "squatting", "standing", "straddling", "top-down bottom-up",
 
-        "riding", "cowgirl", "doggystyle", "missionary", "spitroast", "full nelson",
-        "oral", "fellatio", "blowjob", "deepthroat", "facefuck", "worship", "licking cock",
-        "paizuri", "tittyfuck", "hairjob", "handjob", "footjob", "buttjob", "assjob", "thighjob",
-        "vaginal", "anal", "double penetration", "triple penetration",
-        "cum", "semen", "creampie", "cumshot", "precum", "facial", "bukkake", "ejaculation", "squirting",
-        "masturbation", "fingering", "spank", "slap", "rough sex", "rape", "pull", "grub",
-        "x-ray", "cross-section", "cervix", "uterus" ,"ovulation", "fertilization", "impregnation", "pregnant",
+        "cowgirl", "doggystyle", "full nelson", "missionary", "riding", "spitroast",
 
-        "front view", "side view", "rear view", "back view", "3/4 side view",
-        "from above", "from below", "from behind", "from front", "pov",
-        "low angle", "high angle", "wide angle", "close-up", "full body",
-        "recording", "selfie",
-        "spoken heart", "sound effects", "motion lines", "motion blur", "dutch angle", "unique perspective",
+        "anal", "assjob", "blowjob", "buttjob", "deepthroat", "double penetration", "facefuck", "fellatio",
+        "footjob", "hairjob", "handjob", "licking cock", "oral", "paizuri", "thighjob", "tittyfuck",
+        "triple penetration", "vaginal", "worship",
 
-        "ahegao", "fucked silly", "orgasm", "heart-shaped pupils", "heart-shaped eyes",
-        "closed eyes", "eyes rolled up", "eyes crossed", "moan", "drool",
-        "exhausted", "horny", "lustful", "playful", "seductive", "naughty", "half-lidded eyes", "parted lips",
-        "shocked", "surprised", "scared", "worried", "crying", "tears", "wide eyes",
-        "happy", "smile", "coy eyes", "doe eyes", "smirk", "embarrassed", "shy",
+        "bukkake", "creampie", "cum", "cumshot", "ejaculation", "facial", "precum", "semen", "squirting",
 
-        "ass" ,"anus", "asshole", "pussy", "clitor", "labia" ,"pubic hair", "penis", "cock", "glans", "balls", "testicles",
+        "cuddling", "fingering", "grub", "hugging", "kissing", "masturbation", "pull", "rape", "rough sex", "slap", "spank",
 
-        "character sheet", "multiple views", "split view", "2koma",
+        "cervix", "cross-section", "fertilization", "impregnation", "ovulation", "pregnant", "uterus", "x-ray",
 
-        "lingerie", "panties", "stockings", "thighhighs", "pantyhose", "fishnets", "latex", "leather",
-        "corset", "garter belt", "high heels", "boots", "choker", "collar", "leash",
-        "glasses", "jewelry", "blindfold", "gag", "bunny suit", "maid outfit", "schoolgirl",
+        "3/4 side view", "back view", "close-up", "from above", "from behind", "from below", "from front",
+        "front view", "full body", "high angle", "low angle", "pov", "rear view", "side view", "wide angle",
 
-        "brown hair", "black hair", "blonde", "red hair", "redhead", "white hair", "silver hair", "ginger hair",
-        "gray hair", "blue hair", "green hair", "purple hair", "pink hair", "orange hair", "aqua hair",
-        "short hair", "medium hair", "long hair", "straight hair", "wavy hair", "curly hair", "messy hair",
-        "twin tails", "ponytail", "braid", "hair bun", "bob cut", "hime cut",
+        "dutch angle", "motion blur", "motion lines", "recording", "selfie", "sound effects", "spoken heart", "unique perspective",
 
-        "milf", "mature", "loli", "child", "young", "petite", "size difference", "interracial", "freckles",
+        "ahegao", "angry", "closed eyes", "coy eyes", "crying", "doe eyes", "drool", "embarrassed", "exhausted",
+        "eyes crossed", "eyes rolled up", "fucked silly", "half-lidded eyes", "happy", "heart-shaped eyes",
+        "heart-shaped pupils", "horny", "lustful", "moan", "naughty", "orgasm", "parted lips", "playful",
+        "sad", "scared", "seductive", "shocked", "shy", "smile", "smirk", "surprised", "tears", "wide eyes", "worried",
 
-        "tentacles", "elf", "orc", "witch", "magic", "fantasy", "medieval", "cyberpunk", "realistic", "realism", "anime",
-        "goth", "bimbo", "slut", "makeup"
+        "anus", "areola", "armpits", "arms", "ass", "asshole", "balls", "belly", "breasts", "clitor", "cock",
+        "feet", "fingers", "glans", "hands", "huge breasts", "large breasts", "labia", "legs", "medium breasts",
+        "navel", "nipples", "penis", "pubic hair", "pussy", "small breasts", "testicles", "thighs", "toes",
+
+        "2koma", "character sheet", "multiple views", "split view",
+
+        "bikini", "blindfold", "boots", "bottomless", "bunny suit", "choker", "collar", "corset", "dress",
+        "fishnets", "gag", "garter belt", "glasses", "high heels", "jeans", "jewelry", "latex", "leash",
+        "leather", "lingerie", "maid outfit", "nude", "panties", "pantyhose", "schoolgirl", "shirt", "shorts",
+        "skirt", "stockings", "swimsuit", "thighhighs", "topless",
+
+        "aqua hair", "black hair", "blonde", "blue hair", "bob cut", "braid", "brown hair", "curly hair",
+        "ginger hair", "gray hair", "green hair", "hair bun", "hime cut", "long hair", "medium hair",
+        "messy hair", "orange hair", "pink hair", "ponytail", "purple hair", "red hair", "redhead",
+        "short hair", "silver hair", "straight hair", "twin tails", "wavy hair", "white hair",
+
+        "brown eyes", "blue eyes", "green eyes", "heterochromia", "red eyes", "yellow eyes",
+
+        "child", "freckles", "interracial", "loli", "mature", "milf", "muscular", "petite", "short", "size difference", "tall", "young",
+
+        "anime", "bathroom", "beach", "bedroom", "best quality", "bimbo", "cyberpunk", "day", "elf", "fantasy",
+        "glowing", "goth", "high quality", "indoor", "magic", "makeup", "masterpiece", "medieval", "night",
+        "orc", "outdoor", "particles", "realism", "realistic", "simple background", "slut", "sparkles",
+        "sunset", "sweaty", "tentacles", "white background", "witch", "wet"
     ]
 }

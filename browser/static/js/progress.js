@@ -1,20 +1,24 @@
 const progressBar = {
     eventSource: null,
     taskId: null,
+    _fallbackTimer: null,
 
     connect() {
         if (!this.taskId) return;
 
         this.disconnect();
         this.eventSource = new EventSource(`/progress/${this.taskId}`);
+        
+        this._fallbackTimer = setTimeout(() => {
+            if (this.taskId) {
+                this.close();
+                this._reloadGallery();
+            }
+        }, 5 * 60 * 1000);
 
         this.eventSource.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                if (data.error) {
-                    this.updateError(data.error);
-                    return;
-                }
                 this.update(data);
             } catch (error) {
                 console.error("Ошибка парсинга прогресса:", error);
@@ -25,16 +29,22 @@ const progressBar = {
             if (this.eventSource?.readyState === EventSource.CLOSED) {
                 this.disconnect();
                 setTimeout(() => {
-                    if (this.taskId && DOM.progressContainer && !DOM.progressContainer.classList.contains("hidden")) {
+                    if (this.taskId) {
                         this.close();
+                        this._reloadGallery();
                     }
-                }, 500);
+                }, 1000);
             }
         };
     },
 
     update(data) {
-        const { processed, total, status, message, percentage } = data;
+        const { processed, total, status, message, percentage, error } = data;
+
+        if (error) {
+            this._showError(error);
+            return;
+        }
 
         if (DOM.progressMessage) DOM.progressMessage.textContent = message || "Обработка изображений…";
         if (DOM.progressText) DOM.progressText.textContent = `${processed} / ${total}`;
@@ -42,37 +52,48 @@ const progressBar = {
         if (DOM.progressBar) DOM.progressBar.style.width = `${percentage}%`;
 
         if (status === "completed" || status === "error") {
-            this.disconnect();
-            
-            if (status === "completed") {
+            if (status === "completed" && total > 0) {
+                if (DOM.progressBar) DOM.progressBar.style.width = "100%";
+                if (DOM.progressPercentage) DOM.progressPercentage.textContent = "100%";
+                if (DOM.progressText) DOM.progressText.textContent = `${total} / ${total}`;
                 if (DOM.progressMessage) DOM.progressMessage.textContent = "Обработка завершена успешно";
-                setTimeout(() => this.close(), 300);
-            } else {
-                if (DOM.progressMessage) DOM.progressMessage.textContent = `Ошибка: ${message || "Неизвестная ошибка"}`;
-                if (DOM.progressBar) DOM.progressBar.style.background = "#ff4444";
-                setTimeout(() => this.close(), 1500);
             }
+            
+            this.disconnect();
+            const delay = status === "completed" ? 500 : 2000;
+            setTimeout(() => {
+                this.close();
+                this._reloadGallery();
+            }, delay);
         }
     },
 
-    updateError(errorMessage) {
+    _showError(errorMessage) {
         if (DOM.progressMessage) DOM.progressMessage.textContent = `Ошибка: ${errorMessage}`;
         if (DOM.progressBar) DOM.progressBar.style.background = "#ff4444";
-        setTimeout(() => this.close(), 2000);
+        setTimeout(() => {
+            this.disconnect();
+            this.close();
+            this._reloadGallery();
+        }, 2000);
+    },
+
+    _reloadGallery() {
+        if (window.location.pathname !== "/") {
+            gallery.load();
+        }
     },
 
     show() {
-        if (!DOM.progressContainer || !DOM.progressBar || !DOM.progressMessage || 
-            !DOM.progressText || !DOM.progressPercentage) {
-            console.error("Progress bar elements not found in DOM");
-            return;
-        }
+        if (!DOM.progressContainer) return;
         
         DOM.progressContainer.classList.remove("hidden");
-        DOM.progressBar.style.width = "0%";
-        DOM.progressBar.style.background = "";
-        DOM.progressText.textContent = "0 / 0";
-        DOM.progressPercentage.textContent = "0%";
+        if (DOM.progressBar) {
+            DOM.progressBar.style.width = "0%";
+            DOM.progressBar.style.background = "";
+        }
+        if (DOM.progressText) DOM.progressText.textContent = "0 / 0";
+        if (DOM.progressPercentage) DOM.progressPercentage.textContent = "0%";
         this.blockNavigation();
     },
 
@@ -85,80 +106,52 @@ const progressBar = {
         this.unblockNavigation();
     },
 
-    blockNavigation() {
+    _toggleNavigation(block) {
         const sidebar = DOM.sidebar;
         if (!sidebar) return;
 
-        sidebar.querySelectorAll(".folder-tree a").forEach(link => {
-            link.classList.add("disabled");
-            link.style.pointerEvents = "none";
-            link.style.opacity = "0.5";
-        });
+        const elements = [
+            ...sidebar.querySelectorAll(".folder-tree a"),
+            ...sidebar.querySelectorAll(".folder-toggle"),
+            ...sidebar.querySelectorAll("button.reset-checkboxes-btn, button.delete-metadata-btn")
+        ];
 
-        sidebar.querySelectorAll(".folder-toggle").forEach(toggle => {
-            toggle.style.pointerEvents = "none";
-            toggle.style.opacity = "0.5";
-            toggle.style.cursor = "not-allowed";
-        });
+        if (DOM.searchBox) elements.push(DOM.searchBox);
+        if (DOM.sortSelect) elements.push(DOM.sortSelect);
 
-        if (DOM.searchBox) {
-            DOM.searchBox.disabled = true;
-            DOM.searchBox.style.opacity = "0.5";
-            DOM.searchBox.style.cursor = "not-allowed";
-        }
-
-        if (DOM.sortSelect) {
-            DOM.sortSelect.disabled = true;
-            DOM.sortSelect.style.opacity = "0.5";
-            DOM.sortSelect.style.cursor = "not-allowed";
-        }
-
-        sidebar.querySelectorAll("button.reset-checkboxes-btn, button.delete-metadata-btn").forEach(btn => {
-            btn.disabled = true;
-            btn.style.opacity = "0.5";
-            btn.style.cursor = "not-allowed";
+        elements.forEach(el => {
+            if (block) {
+                el.classList.add("disabled");
+                el.disabled = true;
+                el.style.pointerEvents = "none";
+                el.style.opacity = "0.5";
+                el.style.cursor = "not-allowed";
+            } else {
+                el.classList.remove("disabled");
+                el.disabled = false;
+                el.style.pointerEvents = "";
+                el.style.opacity = "";
+                el.style.cursor = "";
+            }
         });
     },
 
+    blockNavigation() {
+        this._toggleNavigation(true);
+    },
+
     unblockNavigation() {
-        const sidebar = DOM.sidebar;
-        if (!sidebar) return;
-
-        sidebar.querySelectorAll(".folder-tree a").forEach(link => {
-            link.classList.remove("disabled");
-            link.style.pointerEvents = "";
-            link.style.opacity = "";
-        });
-
-        sidebar.querySelectorAll(".folder-toggle").forEach(toggle => {
-            toggle.style.pointerEvents = "";
-            toggle.style.opacity = "";
-            toggle.style.cursor = "";
-        });
-
-        if (DOM.searchBox) {
-            DOM.searchBox.disabled = false;
-            DOM.searchBox.style.opacity = "";
-            DOM.searchBox.style.cursor = "";
-        }
-
-        if (DOM.sortSelect) {
-            DOM.sortSelect.disabled = false;
-            DOM.sortSelect.style.opacity = "";
-            DOM.sortSelect.style.cursor = "";
-        }
-
-        sidebar.querySelectorAll("button.reset-checkboxes-btn, button.delete-metadata-btn").forEach(btn => {
-            btn.disabled = false;
-            btn.style.opacity = "";
-            btn.style.cursor = "";
-        });
+        this._toggleNavigation(false);
     },
 
     disconnect() {
         if (this.eventSource) {
             this.eventSource.close();
             this.eventSource = null;
+        }
+        if (this._fallbackTimer) {
+            clearTimeout(this._fallbackTimer);
+            this._fallbackTimer = null;
         }
     }
 };

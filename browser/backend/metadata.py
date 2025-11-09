@@ -7,52 +7,59 @@ import zlib
 import hashlib
 import logging
 import uuid
-from pathlib import Path
-from typing import Dict, Any, Optional
+import atexit
+from typing import Dict, Any, Optional, List
 
-import fasteners
-from tqdm import tqdm
-
-from paths import get_relative_path, get_absolute_path, get_metadata_path, get_thumbnail_path
+from paths import get_relative_path, get_thumbnail_path
 from config import config
 from tag import extract_tags_from_prompt
+from database import get_connection, init_database, force_save
 
 logger = logging.getLogger(__name__)
 
 
 class MetadataStore:
-    def __init__(self):
-        self._store: Dict[str, Dict[str, Any]] = {}
-        self._path_index: Dict[str, str] = {}
-        self._rwlock = fasteners.ReaderWriterLock()
+    def _row_to_dict(self, row) -> Dict[str, Any]:
+        if not row:
+            return {}
+        return {
+            "id": row["id"],
+            "prompt": row["prompt"] or "",
+            "checked": bool(row["checked"]),
+            "rating": row["rating"] or 0,
+            "tags": json.loads(row["tags"]) if row["tags"] else [],
+            "size": row["size"] or 0,
+            "hash": row["hash"] or "",
+            "image_path": row["image_path"],
+            "thumb_path": row["thumb_path"] or ""
+        }
 
-    def _load_from_file(self, image_path: str) -> Dict[str, Any]:
-        path = get_metadata_path(image_path)
-        metadata = {}
+    def _dict_to_row(self, metadata: Dict[str, Any]) -> tuple:
+        return (
+            metadata.get("id"),
+            metadata.get("prompt", ""),
+            1 if metadata.get("checked", False) else 0,
+            metadata.get("rating", 0) or 0,
+            json.dumps(metadata.get("tags", []), ensure_ascii=False),
+            metadata.get("size", 0) or 0,
+            metadata.get("hash", ""),
+            metadata.get("image_path", ""),
+            metadata.get("thumb_path", "")
+        )
 
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    metadata = json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
-                logger.warning(f"Ошибка чтения метаданных из {path}: {e}")
-
-        return metadata
-
-    def _save_to_file(self, metadata: Dict[str, Any]) -> None:
-        meta_path = metadata.get("meta_path")
-        if not meta_path:
-            raise ValueError("Путь к метаданным не найден в метаданных")
-
-        path = get_absolute_path(meta_path)
+    def _load_from_db(self, image_path: str) -> Optional[Dict[str, Any]]:
+        rel_image_path = get_relative_path(image_path)
+        
         try:
-            Path(path).parent.mkdir(parents=True, exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, ensure_ascii=False, indent=4)
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM metadata WHERE image_path = ?", (rel_image_path,))
+                row = cursor.fetchone()
+                if row:
+                    return self._row_to_dict(row)
         except Exception as e:
-            error_msg = f"Ошибка сохранения метаданных в {path}: {e}"
-            logger.error(error_msg)
-            raise OSError(error_msg) from e
+            logger.warning(f"Ошибка чтения метаданных из БД для {image_path}: {e}")
+        return None
 
     def _extract_prompt_from_image(self, image_path: str) -> str:
         try:
@@ -109,32 +116,31 @@ class MetadataStore:
             logger.warning(f"Ошибка вычисления хеша для {image_path}: {e}")
             return ""
 
-
     def has_metadata(self, image_path: str) -> bool:
-        path = get_metadata_path(image_path)
-        return os.path.exists(path) and os.path.getsize(path) > 0
+        rel_image_path = get_relative_path(image_path)
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM metadata WHERE image_path = ?", (rel_image_path,))
+                row = cursor.fetchone()
+                return row[0] > 0 if row else False
+        except Exception as e:
+            logger.warning(f"Ошибка проверки метаданных для {image_path}: {e}")
+            return False
 
     def save(self, metadata: Dict[str, Any]) -> None:
-        metadata_id = metadata.get("id")
-        if not metadata_id:
+        if not metadata.get("id"):
             raise ValueError("ID метаданных не найден")
 
-        metadata_copy = metadata.copy()
-        self._save_to_file(metadata_copy)
-
-        with self._rwlock.write_lock():
-            old_image_path = None
-            if metadata_id in self._store:
-                old_image_path = self._store[metadata_id].get("image_path")
-            
-            self._store[metadata_id] = metadata_copy
-            image_path = metadata_copy.get("image_path")
-            
-            if old_image_path and old_image_path != image_path:
-                self._path_index.pop(old_image_path, None)
-            
-            if image_path:
-                self._path_index[image_path] = metadata_id
+        row_data = self._dict_to_row(metadata)
+        
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO metadata 
+                (id, prompt, checked, rating, tags, size, hash, image_path, thumb_path, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, row_data)
 
     def update(self, metadata_id: str, updates: Dict[str, Any]) -> None:
         metadata = self.get_by_id(metadata_id)
@@ -144,117 +150,156 @@ class MetadataStore:
         self.save(metadata)
 
     def get_by_id(self, metadata_id: str) -> Optional[Dict[str, Any]]:
-        with self._rwlock.read_lock():
-            if metadata_id in self._store:
-                return self._store[metadata_id].copy()
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM metadata WHERE id = ?", (metadata_id,))
+                row = cursor.fetchone()
+                if row:
+                    return self._row_to_dict(row)
+        except Exception as e:
+            logger.warning(f"Ошибка получения метаданных по ID {metadata_id}: {e}")
         return None
 
-    def get_all(self) -> list:
-        with self._rwlock.read_lock():
-            return [metadata.copy() for metadata in self._store.values()]
+    def get_all(self) -> List[Dict[str, Any]]:
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM metadata")
+                rows = cursor.fetchall()
+                return [self._row_to_dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Ошибка получения всех метаданных: {e}")
+            return []
+
+    def get_batch(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
+        if not image_paths:
+            return []
+        
+        rel_paths = [get_relative_path(path) for path in image_paths]
+        result: List[Optional[Dict[str, Any]]] = [None] * len(image_paths)
+        path_to_index = {rel_path: idx for idx, rel_path in enumerate(rel_paths)}
+        
+        placeholders = ",".join("?" * len(rel_paths))
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT * FROM metadata WHERE image_path IN ({placeholders})", rel_paths)
+                rows = cursor.fetchall()
+                for row in rows:
+                    metadata = self._row_to_dict(row)
+                    image_path = metadata.get("image_path")
+                    if image_path in path_to_index:
+                        result[path_to_index[image_path]] = metadata
+        except Exception as e:
+            logger.warning(f"Ошибка batch чтения метаданных: {e}")
+        return result
+
+    def save_batch(self, metadata_list: List[Dict[str, Any]]) -> None:
+        if not metadata_list:
+            return
+        
+        logger.info(f"Начало batch сохранения {len(metadata_list)} метаданных")
+        rows_data = [self._dict_to_row(metadata) for metadata in metadata_list]
+        
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany("""
+                INSERT OR REPLACE INTO metadata 
+                (id, prompt, checked, rating, tags, size, hash, image_path, thumb_path, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, rows_data)
+        
+        logger.info(f"Завершено batch сохранение {len(metadata_list)} метаданных")
+        force_save()
+
+    def update_batch(self, updates: List[Dict[str, Any]]) -> int:
+        if not updates:
+            return 0
+        
+        metadata_ids = [update.get("id") for update in updates if update.get("id")]
+        if not metadata_ids:
+            return 0
+        
+        logger.info(f"Начало batch обновления {len(updates)} метаданных")
+        current_metadata = {}
+        placeholders = ",".join("?" * len(metadata_ids))
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT * FROM metadata WHERE id IN ({placeholders})", metadata_ids)
+                rows = cursor.fetchall()
+                rows_list = [self._row_to_dict(row) for row in rows]
+                for metadata in rows_list:
+                    current_metadata[metadata["id"]] = metadata
+        except Exception as e:
+            logger.warning(f"Ошибка загрузки метаданных для batch update: {e}")
+            return 0
+        
+        updated_metadata = []
+        allowed_keys = {"checked", "rating", "tags"}
+        for update in updates:
+            metadata_id = update.get("id")
+            if not metadata_id or metadata_id not in current_metadata:
+                continue
+            metadata = current_metadata[metadata_id].copy()
+            for key, value in update.items():
+                if key != "id" and key in allowed_keys:
+                    metadata[key] = value
+            updated_metadata.append(metadata)
+        
+        if updated_metadata:
+            self.save_batch(updated_metadata)
+        logger.info(f"Завершено batch обновление {len(updated_metadata)} метаданных")
+        return len(updated_metadata)
+
+    def delete_batch(self, metadata_ids: List[str]) -> int:
+        if not metadata_ids:
+            return 0
+        
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                placeholders = ",".join("?" * len(metadata_ids))
+                cursor.execute(f"DELETE FROM metadata WHERE id IN ({placeholders})", metadata_ids)
+                return cursor.rowcount
+        except Exception as e:
+            logger.error(f"Ошибка batch удаления метаданных: {e}")
+            raise
+
+    def _create_metadata(self, image_path: str) -> Dict[str, Any]:
+        prompt = self._extract_prompt_from_image(image_path)
+        return {
+            "prompt": prompt,
+            "checked": False,
+            "rating": 0,
+            "tags": extract_tags_from_prompt(image_path, prompt),
+            "size": os.path.getsize(image_path),
+            "hash": self._calculate_file_hash(image_path),
+            "image_path": get_relative_path(image_path),
+            "thumb_path": get_relative_path(get_thumbnail_path(image_path)),
+            "id": str(uuid.uuid4())
+        }
 
     def get(self, image_path: str) -> Dict[str, Any]:
-        rel_image_path = get_relative_path(image_path)
-        metadata = None
-        modified = False
-
-        with self._rwlock.read_lock():
-            metadata_id = self._path_index.get(rel_image_path)
-            if metadata_id and metadata_id in self._store:
-                metadata = self._store[metadata_id].copy()
-
+        metadata = self._load_from_db(image_path)
         if not metadata:
-            file_metadata = self._load_from_file(image_path)
-
-            if file_metadata and file_metadata.get("id"):
-                metadata_id = file_metadata.get("id")
-                with self._rwlock.write_lock():
-                    self._store[metadata_id] = file_metadata.copy()
-                    image_path_from_file = file_metadata.get("image_path")
-                    if image_path_from_file:
-                        self._path_index[image_path_from_file] = metadata_id
-                metadata = file_metadata.copy()
-
-        if not metadata:
-            prompt = self._extract_prompt_from_image(image_path)
-            metadata = {
-                "prompt": prompt,
-                "checked": False,
-                "rating": 0,
-                "tags": extract_tags_from_prompt(image_path, prompt),
-                "size": os.path.getsize(image_path),
-                "hash": self._calculate_file_hash(image_path),
-                "image_path": get_relative_path(image_path),
-                "meta_path": get_relative_path(get_metadata_path(image_path)),
-                "thumb_path": get_relative_path(get_thumbnail_path(image_path)),
-                "id": str(uuid.uuid4())
-            }
-            modified = True
-
-        if modified:
+            metadata = self._create_metadata(image_path)
             self.save(metadata)
-
         return metadata
 
     def delete(self, metadata_id: str) -> None:
-        metadata = self.get_by_id(metadata_id)
-        if not metadata:
-            return
-
-        meta_path = metadata.get("meta_path")
-        if meta_path:
-            path = get_absolute_path(meta_path)
-            if os.path.exists(path):
-                try:
-                    os.remove(path)
-                except OSError as e:
-                    logger.warning(f"Не удалось удалить файл метаданных {path}: {e}")
-
-        with self._rwlock.write_lock():
-            self._store.pop(metadata_id, None)
-            image_path = metadata.get("image_path")
-            if image_path:
-                self._path_index.pop(image_path, None)
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM metadata WHERE id = ?", (metadata_id,))
+        except Exception as e:
+            logger.error(f"Ошибка удаления метаданных {metadata_id}: {e}")
+            raise
 
     def initialize(self) -> None:
-        metadata_dir = os.path.join(config.IMAGE_FOLDER, ".metadata")
-        if not os.path.exists(metadata_dir):
-            return
-
-        count = 0
-        errors = 0
-        
-        # Собираем все файлы метаданных
-        metadata_files = []
-        for root, dirs, files in os.walk(metadata_dir):
-            for file in files:
-                if file.endswith(".json"):
-                    metadata_files.append(os.path.join(root, file))
-
-        with self._rwlock.write_lock():
-            for meta_path in tqdm(metadata_files, desc="Загрузка метаданных", unit="файл"):
-                try:
-                    with open(meta_path, "r", encoding="utf-8") as f:
-                        metadata = json.load(f)
-                        metadata_id = metadata.get("id")
-                        if metadata_id:
-                            self._store[metadata_id] = metadata
-                            image_path = metadata.get("image_path")
-                            if image_path:
-                                self._path_index[image_path] = metadata_id
-                            count += 1
-                        else:
-                            logger.warning(f"Метаданные без ID найдены в {meta_path}")
-                except (json.JSONDecodeError, IOError) as e:
-                    logger.warning(f"Ошибка чтения метаданных {meta_path}: {e}")
-                    errors += 1
-
-        logger.info(f"Загружено метаданных: {count}, ошибок: {errors}")
-
-    def clear_cache(self) -> None:
-        with self._rwlock.write_lock():
-            self._store.clear()
-            self._path_index.clear()
+        init_database()
+        atexit.register(force_save)
 
 
 metadata_store = MetadataStore()

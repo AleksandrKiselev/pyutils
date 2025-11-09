@@ -7,12 +7,11 @@ const favorites = {
                 body: JSON.stringify({ id: metadataId })
             });
 
-            if (result.success) {
-            } else {
-                alert("Ошибка копирования: " + (result.error || "неизвестная"));
+            if (!result.success) {
+                toast.show("Ошибка копирования: " + (result.error || "неизвестная"), null, 5000);
             }
         } catch (err) {
-            alert("Ошибка соединения: " + err);
+            utils.showError("Ошибка соединения", err);
         }
     },
 

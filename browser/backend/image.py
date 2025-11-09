@@ -3,6 +3,7 @@ import random
 import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional, Dict
 
 from metadata import metadata_store
 from paths import get_absolute_path, get_image_paths
@@ -29,24 +30,72 @@ def collect_images(folder=None, progress_callback=None):
     if progress_callback:
         progress_callback(0, total, f"Найдено {total} изображений")
 
-    max_workers = min(32, (os.cpu_count() or 1) * 4, total)
-    results = [None] * total
-    processed = 0
+    BATCH_SIZE = 1000
+    results = []
+    new_images = []
+    
+    logger.info(f"Начало загрузки метаданных для {total} изображений")
+    for i in range(0, total, BATCH_SIZE):
+        batch_paths = image_paths[i:i + BATCH_SIZE]
+        batch_metadata = metadata_store.get_batch(batch_paths)
+        
+        for idx, path in enumerate(batch_paths):
+            batch_idx = i + idx
+            if idx < len(batch_metadata) and batch_metadata[idx] is not None:
+                results.append((batch_idx, batch_metadata[idx]))
+            else:
+                new_images.append((batch_idx, path))
+        
+        processed = min(i + len(batch_paths), total)
+        if progress_callback:
+            progress_callback(processed, total, f"Загрузка метаданных {processed}/{total}")
 
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(metadata_store.get, path): idx for idx, path in enumerate(image_paths)}
-
-        for future in as_completed(futures):
-            idx = futures[future]
+    if new_images:
+        max_workers = min(32, (os.cpu_count() or 1) * 4, len(new_images))
+        new_metadata_list = []
+        
+        def create_metadata(original_idx: int, path: str) -> Optional[tuple]:
             try:
-                results[idx] = future.result()
-                processed += 1
-                if progress_callback:
-                    progress_callback(processed, total, f"Обработка {processed}/{total}")
+                metadata = metadata_store._create_metadata(path)
+                return (original_idx, metadata)
             except Exception as e:
-                logger.error(f"Ошибка обработки изображения {image_paths[idx]}: {e}")
+                logger.error(f"Ошибка обработки изображения {path}: {e}")
+                return None
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {
+                pool.submit(create_metadata, original_idx, path): (original_idx, path)
+                for original_idx, path in new_images
+            }
+            
+            logger.info(f"Начало создания метаданных для {len(new_images)} новых изображений")
+            for future in as_completed(futures):
+                original_idx, path = futures[future]
+                try:
+                    result = future.result()
+                    if result:
+                        idx, metadata = result
+                        results.append((idx, metadata))
+                        new_metadata_list.append(metadata)
+                    processed = len(results)
+                    if progress_callback:
+                        progress_callback(processed, total, f"Создание метаданных {processed}/{total}")
+                except Exception as e:
+                    logger.error(f"Ошибка обработки изображения {path}: {e}")
+            
+            logger.info(f"Завершено создание метаданных для {len(new_metadata_list)} изображений")
+        
+        if new_metadata_list:
+            metadata_store.save_batch(new_metadata_list)
 
-    return [r for r in results if r is not None]
+    results.sort(key=lambda x: x[0])
+    logger.info(f"Завершена загрузка метаданных для {len(results)} изображений")
+    
+    # Финальный вызов прогресса - 100% завершено
+    if progress_callback:
+        progress_callback(total, total, f"Обработка завершена: {len(results)} изображений")
+    
+    return [metadata for _, metadata in results]
 
 
 def sort_images(images, sort_by, order):
@@ -54,8 +103,6 @@ def sort_images(images, sort_by, order):
         return images
 
     if sort_by == "random":
-        # Случайная сортировка обрабатывается в services.py
-        # Здесь просто возвращаем изображения без изменений
         return images
 
     reverse = (order == "desc")

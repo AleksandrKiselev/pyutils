@@ -27,22 +27,14 @@ def _count_images_in_dir(dir_path: str) -> int:
         return 0
 
 
-def get_metadata_file_path(image_path: str, ext: str) -> str:
+def get_thumbnail_path(image_path: str) -> str:
     rel_path = get_relative_path(image_path)
     rel_dir = PathLib(rel_path).parent
     meta_dir = PathLib(config.IMAGE_FOLDER) / ".metadata" / rel_dir
     meta_dir.mkdir(parents=True, exist_ok=True)
 
     filename_hash = _get_filename_hash(image_path)
-    return str(meta_dir / f"{filename_hash}{ext}")
-
-
-def get_metadata_path(image_path: str) -> str:
-    return get_metadata_file_path(image_path, ".json")
-
-
-def get_thumbnail_path(image_path: str) -> str:
-    return get_metadata_file_path(image_path, ".webp")
+    return str(meta_dir / f"{filename_hash}.webp")
 
 
 def get_absolute_path(relative_path: str, root_folder: Optional[str] = None) -> str:
@@ -74,8 +66,8 @@ def get_image_paths(folder: Optional[str] = None) -> List[str]:
     return list(walk_images())
 
 
-def get_absolute_paths(metadata: Dict[str, Any], root_folder: Optional[str] = None) -> Tuple[str, str, str]:
-    required_keys = ["image_path", "thumb_path", "meta_path"]
+def get_absolute_paths(metadata: Dict[str, Any], root_folder: Optional[str] = None) -> Tuple[str, str]:
+    required_keys = ["image_path", "thumb_path"]
     missing = [key for key in required_keys if not metadata.get(key)]
     if missing:
         raise ValueError(f"В метаданных отсутствуют пути: {', '.join(missing)}")

@@ -79,7 +79,7 @@ const folders = {
         const normalizePath = (path) => {
             try {
                 return decodeURIComponent(path.replace(/^\/+/, ''));
-            } catch (e) {
+            } catch {
                 return path.replace(/^\/+/, '');
             }
         };
@@ -88,28 +88,21 @@ const folders = {
         let activeLink = document.querySelector(`.folder-tree a[href="${currentPath}"]`);
         
         if (!activeLink) {
-            const allLinks = document.querySelectorAll(".folder-tree a");
-            for (const link of allLinks) {
+            document.querySelectorAll(".folder-tree a").forEach(link => {
                 try {
-                    let linkPath;
-                    if (link.href.startsWith('http://') || link.href.startsWith('https://')) {
-                        linkPath = new URL(link.href).pathname;
-                    } else {
-                        linkPath = new URL(link.href, window.location.origin).pathname;
-                    }
-                    
+                    const linkPath = link.href.startsWith('http') 
+                        ? new URL(link.href).pathname 
+                        : new URL(link.href, window.location.origin).pathname;
                     if (normalizePath(linkPath) === normalizedCurrent) {
                         activeLink = link;
-                        break;
                     }
-                } catch (e) {
+                } catch {
                     const href = link.getAttribute("href");
                     if (href && normalizePath(href) === normalizedCurrent) {
                         activeLink = link;
-                        break;
                     }
                 }
-            }
+            });
         }
         
         if (activeLink) {

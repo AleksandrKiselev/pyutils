@@ -37,14 +37,14 @@ class ProgressManager:
             if task_id not in self._storage:
                 return
 
-            self._storage[task_id].update({
+            task = self._storage[task_id]
+            task.update({
                 "processed": processed,
                 "total": total,
-                "status": "processing",
-                "created_at": datetime.now()
+                "status": "processing"
             })
             if message:
-                self._storage[task_id]["message"] = message
+                task["message"] = message
 
     def complete(self, task_id: str, message: str = "Завершено") -> None:
         with self._lock:
@@ -65,7 +65,7 @@ class ProgressManager:
 
             self._storage[task_id].update({
                 "status": "error",
-                "message": "Ошибка",
+                "message": error_message,
                 "error": error_message
             })
 

@@ -4,19 +4,16 @@ import shutil
 import random
 import logging
 from pathlib import Path
-from typing import List, Dict, Optional, Callable
-from concurrent.futures import ThreadPoolExecutor
+from typing import List, Dict, Optional
 
-from paths import get_absolute_path, get_relative_path, get_absolute_paths, get_metadata_path, get_thumbnail_path
+from paths import get_absolute_path, get_relative_path, get_absolute_paths, get_thumbnail_path
 from metadata import metadata_store
 from image import collect_images, filter_images, sort_images
 from thumbnail import ThumbnailService
 from config import config
+from database import force_save
 
 logger = logging.getLogger(__name__)
-
-PARALLEL_THRESHOLD = 100
-MAX_WORKERS = 16
 
 
 def _get_filtered_images(folder_path: Optional[str], search: str) -> List[Dict]:
@@ -31,15 +28,6 @@ def _get_metadata_or_raise(metadata_id: str) -> Dict:
     return metadata
 
 
-def _process_images_parallel(images: List[Dict], processor: Callable[[Dict], int]) -> int:
-    if len(images) < PARALLEL_THRESHOLD:
-        return sum(processor(img) for img in images)
-
-    max_workers = min(MAX_WORKERS, (os.cpu_count() or 1) * 2)
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        return sum(pool.map(processor, images))
-
-
 class ImageService:
     @staticmethod
     def get_images(folder_path: Optional[str], search: str, sort_by: str,
@@ -47,13 +35,10 @@ class ImageService:
         images = _get_filtered_images(folder_path, search)
         
         if sort_by == "random":
-            # Для случайной сортировки игнорируем offset и каждый раз выбираем случайные изображения
             if not images:
                 return []
-            # Выбираем случайные изображения из всей коллекции
             page_images = random.sample(images, min(limit, len(images)))
         else:
-            # Для обычной сортировки используем стандартную логику
             images = sort_images(images, sort_by, order)
             page_images = images[offset:offset + limit]
         
@@ -64,11 +49,12 @@ class ImageService:
     @staticmethod
     def delete_image(metadata_id: str) -> None:
         metadata = _get_metadata_or_raise(metadata_id)
-        _, thumb, _ = get_absolute_paths(metadata)
+        _, thumb = get_absolute_paths(metadata)
         os.remove(get_absolute_path(metadata["image_path"]))
         if os.path.exists(thumb):
             os.remove(thumb)
         metadata_store.delete(metadata_id)
+        force_save()
 
 
 class MetadataService:
@@ -79,43 +65,35 @@ class MetadataService:
         if not metadata_updates:
             return
 
-        for metadata_id in metadata_ids:
-            metadata = metadata_store.get_by_id(metadata_id)
-            if not metadata:
-                logger.warning(f"Метаданные с ID {metadata_id} не найдены")
-                continue
-            metadata_store.update(metadata_id, metadata_updates)
+        batch_updates = [{"id": metadata_id, **metadata_updates} for metadata_id in metadata_ids]
+        updated_count = metadata_store.update_batch(batch_updates)
+        if updated_count < len(metadata_ids):
+            logger.warning(f"Обновлено {updated_count} из {len(metadata_ids)} метаданных")
+        force_save()
 
     @staticmethod
     def uncheck_all(folder_path: Optional[str], search: str) -> int:
         images = _get_filtered_images(folder_path, search)
-
-        def process_single(img: Dict) -> int:
-            metadata_id = img.get("id")
-            if not metadata_id:
-                return 0
-
-            metadata = metadata_store.get_by_id(metadata_id)
-            if not metadata or not metadata.get("checked"):
-                return 0
-
-            metadata_store.update(metadata_id, {"checked": False})
-            return 1
-
-        return _process_images_parallel(images, process_single)
+        metadata_ids_to_update = [
+            img.get("id") for img in images 
+            if img.get("id") and img.get("checked")
+        ]
+        if not metadata_ids_to_update:
+            return 0
+        batch_updates = [{"id": metadata_id, "checked": False} for metadata_id in metadata_ids_to_update]
+        result = metadata_store.update_batch(batch_updates)
+        force_save()
+        return result
 
     @staticmethod
     def delete_metadata(folder_path: Optional[str], search: str) -> int:
         images = _get_filtered_images(folder_path, search)
-
-        def process_single(img: Dict) -> int:
-            metadata_id = img.get("id")
-            if not metadata_id:
-                return 0
-            metadata_store.delete(metadata_id)
-            return 1
-
-        return sum(process_single(img) for img in images)
+        metadata_ids = [img.get("id") for img in images if img.get("id")]
+        if not metadata_ids:
+            return 0
+        result = metadata_store.delete_batch(metadata_ids)
+        force_save()
+        return result
 
 
 class FavoritesService:
@@ -137,7 +115,6 @@ class FavoritesService:
 
         new_metadata = metadata.copy()
         new_metadata["image_path"] = get_relative_path(dst)
-        new_metadata["meta_path"] = get_relative_path(get_metadata_path(dst))
         new_metadata["thumb_path"] = get_relative_path(get_thumbnail_path(dst))
         new_metadata["id"] = str(uuid.uuid4())
 
@@ -146,3 +123,4 @@ class FavoritesService:
         new_metadata["tags"] = sorted(tags)
 
         metadata_store.save(new_metadata)
+        force_save()

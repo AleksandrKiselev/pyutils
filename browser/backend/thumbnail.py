@@ -30,7 +30,7 @@ def suppress_stderr():
 class ThumbnailService:
     @staticmethod
     def needs_thumbnail(metadata: Dict[str, Any]) -> bool:
-        image_path, thumb_path, _ = get_absolute_paths(metadata)
+        image_path, thumb_path = get_absolute_paths(metadata)
 
         if not os.path.exists(thumb_path):
             return True
@@ -42,7 +42,7 @@ class ThumbnailService:
 
     @staticmethod
     def create_thumbnail(metadata: Dict[str, Any]) -> bool:
-        image_path, thumb_path, _ = get_absolute_paths(metadata)
+        image_path, thumb_path = get_absolute_paths(metadata)
 
         if os.path.exists(thumb_path):
             return True

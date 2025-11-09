@@ -22,13 +22,7 @@ const fullscreen = {
         DOM.fullscreenPrompt.textContent = data.prompt || "";
 
         const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
-        const fileSize = data.size || 0;
-        const fileSizeFormatted = fileSize >= 1024 * 1024 
-            ? (fileSize / (1024 * 1024)).toFixed(2) + " MB"
-            : fileSize >= 1024
-            ? (fileSize / 1024).toFixed(2) + " KB"
-            : fileSize + " B";
-        DOM.fullscreenFilename.innerHTML = `${filenameOnly} <span class="file-size">${fileSizeFormatted}</span>`;
+        DOM.fullscreenFilename.innerHTML = `${filenameOnly} <span class="file-size">${utils.formatFileSize(data.size || 0)}</span>`;
 
         const miniCheckbox = document.querySelector(`.image-checkbox[data-id="${metadataId}"]`);
         const isChecked = miniCheckbox ? miniCheckbox.checked : !!data.checked;
@@ -86,14 +80,8 @@ const fullscreen = {
 
                 data.rating = newRating;
 
-                const metadataId = data?.id || "";
-                const img = state.currentImages.find(i => {
-                    const id = i?.id || "";
-                    return id === metadataId;
-                });
-                if (img) {
-                    img.rating = newRating;
-                }
+                const img = utils.findImageById(data?.id || "");
+                if (img) img.rating = newRating;
 
                 stars.forEach(s => {
                     const r = parseInt(s.dataset.rating);
@@ -140,25 +128,23 @@ const fullscreen = {
             });
 
             if (result.success) {
-                const thumb = document.querySelector(`.image-checkbox[data-id="${metadataId}"]`)?.closest(".image-container");
-                thumb?.remove();
-
+                document.querySelector(`.image-checkbox[data-id="${metadataId}"]`)?.closest(".image-container")?.remove();
                 state.currentImages.splice(state.currentIndex, 1);
                 gallery.rebindIndices();
 
                 if (state.currentImages.length === 0) {
                     fullscreen.close();
-                } else if (state.currentIndex >= state.currentImages.length) {
-                    state.currentIndex = state.currentImages.length - 1;
-                    fullscreen.updateView();
                 } else {
+                    if (state.currentIndex >= state.currentImages.length) {
+                        state.currentIndex = state.currentImages.length - 1;
+                    }
                     fullscreen.updateView();
                 }
             } else {
-                alert("Ошибка удаления: " + (result.error || "неизвестная"));
+                toast.show("Ошибка удаления: " + (result.error || "неизвестная"), null, 5000);
             }
         } catch (error) {
-            alert("Ошибка удаления: " + error);
+            utils.showError("Ошибка удаления", error);
         }
     },
 
