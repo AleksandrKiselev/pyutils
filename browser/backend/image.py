@@ -1,4 +1,5 @@
 import os
+import random
 import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -50,6 +51,11 @@ def collect_images(folder=None, progress_callback=None):
 
 def sort_images(images, sort_by, order):
     if not images:
+        return images
+
+    if sort_by == "random":
+        # Случайная сортировка обрабатывается в services.py
+        # Здесь просто возвращаем изображения без изменений
         return images
 
     reverse = (order == "desc")

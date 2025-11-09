@@ -1,6 +1,7 @@
 import os
 import uuid
 import shutil
+import random
 import logging
 from pathlib import Path
 from typing import List, Dict, Optional, Callable
@@ -44,8 +45,17 @@ class ImageService:
     def get_images(folder_path: Optional[str], search: str, sort_by: str,
                    order: str, limit: int, offset: int) -> List[Dict]:
         images = _get_filtered_images(folder_path, search)
-        images = sort_images(images, sort_by, order)
-        page_images = images[offset:offset + limit]
+        
+        if sort_by == "random":
+            # Для случайной сортировки игнорируем offset и каждый раз выбираем случайные изображения
+            if not images:
+                return []
+            # Выбираем случайные изображения из всей коллекции
+            page_images = random.sample(images, min(limit, len(images)))
+        else:
+            # Для обычной сортировки используем стандартную логику
+            images = sort_images(images, sort_by, order)
+            page_images = images[offset:offset + limit]
         
         ThumbnailService.ensure_thumbnails_batch(page_images)
         

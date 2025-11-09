@@ -128,7 +128,7 @@ def get_images(subpath: str = ""):
 
     sort_by = request.args.get("sort_by", "date")
     order = request.args.get("order", "asc")
-    valid_sort_fields = {"date", "filename", "prompt", "rating", "tags", "size", "hash"}
+    valid_sort_fields = {"date", "filename", "prompt", "rating", "tags", "size", "hash", "random"}
     valid_orders = {"asc", "desc"}
     if sort_by not in valid_sort_fields:
         raise ValueError(f"Неверное sort_by: {sort_by}")

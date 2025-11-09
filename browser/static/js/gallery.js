@@ -90,10 +90,20 @@ const gallery = {
 
         try {
             const [sort, order] = state.sortBy.split("-");
+            const isRandom = sort === "random";
+            
+            // Для случайной сортировки offset не важен, но передаем его для совместимости
             const query = `/images${window.location.pathname}?limit=${limit}&offset=${state.offset}&search=${encodeURIComponent(state.searchQuery)}&sort_by=${sort}&order=${order}`;
             const images = await (await fetch(query)).json();
 
-            if (!images.length) {
+            // Для обычной сортировки останавливаемся при пустом массиве (конец пагинации)
+            if (!isRandom && !images.length) {
+                state.loading = false;
+                return;
+            }
+
+            // Для случайной сортировки: если получили пустой массив, значит коллекция пуста
+            if (isRandom && !images.length) {
                 state.loading = false;
                 return;
             }
@@ -104,8 +114,9 @@ const gallery = {
                 }
             });
 
+            const startIndex = state.currentImages.length;
             state.currentImages.push(...images);
-            const cardsHTML = gallery.renderCards(images);
+            const cardsHTML = gallery.renderCards(images, startIndex);
             DOM.gallery.insertAdjacentHTML("beforeend", cardsHTML);
 
             gallery.loadCheckboxState();
@@ -113,7 +124,12 @@ const gallery = {
                 const metadataId = img?.id || "";
                 rating.updateStars(null, metadataId, img?.rating || 0);
             });
-            state.offset += images.length;
+            
+            // Для случайной сортировки не увеличиваем offset, чтобы загрузка продолжалась бесконечно
+            // Для обычной сортировки увеличиваем offset как обычно
+            if (!isRandom) {
+                state.offset += images.length;
+            }
 
             const containers = DOM.gallery.querySelectorAll(".image-container:not(.image-loaded)");
             if (containers.length > 0) {
@@ -148,7 +164,10 @@ const gallery = {
         }
     },
 
-    renderCards(images) {
+    renderCards(images, startIndex = null) {
+        // Если startIndex не передан, используем state.offset для обратной совместимости
+        const baseIndex = startIndex !== null ? startIndex : state.offset;
+        
         return images.map((img, index) => {
             // Все пути хранятся в метаданных
             const metadataId = img?.id || "";
@@ -180,7 +199,7 @@ const gallery = {
             }
 
             return `
-                <div class="image-container" onclick="fullscreen.open(${state.offset + index})"
+                <div class="image-container" onclick="fullscreen.open(${baseIndex + index})"
                      onmouseenter="rating.showStars(event)" onmouseleave="rating.hideStars(event)" ${aspectRatioStyle}>
                     <div class="image-buttons">
                         <button class="copy-btn" onclick="clipboard.copy(event, '${prompt}')" title="Копировать промпт">⧉</button>
