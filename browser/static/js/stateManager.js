@@ -6,6 +6,9 @@ const stateManager = {
             sidebarVisible: document.body.classList.contains("sidebar-visible")
         };
         localStorage.setItem("galleryState", JSON.stringify(state));
+        if (typeof folders !== "undefined" && folders.saveState) {
+            folders.saveState();
+        }
     },
 
     restore() {

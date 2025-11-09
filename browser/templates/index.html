@@ -8,16 +8,14 @@
 </head>
 <body>
     <aside id="sidebar" class="sidebar">
-        <div class="sidebar-header">
-            <button id="menu-toggle" class="sidebar-toggle" title="Закрыть панель">
-                <span id="menu-icon">⯇</span>
-            </button>
-        </div>
         <div class="sidebar-content">
             <div class="search-sort-bar">
                 <div class="search-sort-center">
                     <div class="search-container">
-                        <input type="text" id="search-box" placeholder="prompt |t: | d: | g: | g:t: | g:d:" oninput="filterImages()">
+                        <input type="text" id="search-box" placeholder="text|t:|d:|g:|g:t:|g:d:" oninput="filterImages()">
+                        <button id="menu-toggle" class="sidebar-toggle" title="Закрыть панель">
+                            <span id="menu-icon">⯇</span>
+                        </button>
                     </div>
                     <div class="sort-container">
                         <select id="sort-select" onchange="changeSort()">
@@ -48,7 +46,7 @@
                 {% macro render_tree(tree) %}
                 <ul class="folder-tree">
                     {% for path, node in tree.items() %}
-                        <li class="folder-item{% if node.children %} has-children expanded{% endif %}">
+                        <li class="folder-item{% if node.children %} has-children expanded{% endif %}" data-folder-path="{{ path }}">
                             <div class="folder-row" data-has-children="{{ node.children is defined and node.children }}">
                                 {% if node.children %}
                                     <span class="folder-toggle" onclick="toggleFolder(event)">⯈</span>
@@ -70,7 +68,6 @@
                 {% endmacro %}
                 {{ render_tree(folder_tree) }}
             </div>
-            <div class="sidebar-folders-bottom-spacer"></div>
         </div>
     </aside>
 

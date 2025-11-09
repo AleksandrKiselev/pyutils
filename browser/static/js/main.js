@@ -57,6 +57,8 @@ window.onload = function () {
         }
     });
 
+    folders.restoreState();
+
     window.addEventListener("scroll", () => {
         if (window.innerHeight + window.scrollY >= document.body.offsetHeight - SCROLL_THRESHOLD) {
             gallery.loadMore();

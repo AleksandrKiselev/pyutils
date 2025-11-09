@@ -143,7 +143,6 @@
 
     /* Element-Specific Sizes */
     --folder-toggle-width: 14px;
-    --sidebar-spacer-height: 32px;
     --scroll-btn-gap: var(--offset-sm);
     --folder-row-gap: var(--offset-sm);
     --reset-btn-gap: var(--offset-md);
@@ -255,21 +254,12 @@ body.sidebar-visible .sidebar {
     box-shadow: var(--shadow-sidebar);
 }
 
-.sidebar-header {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-bottom: var(--sidebar-border-width) solid rgba(255, 152, 0, 0.1);
-    flex-shrink: 0;
-}
-
 .sidebar-toggle {
     background: transparent;
     border: none;
     color: var(--menu-toggle-color);
-    font-size: var(--font-size-xl);
-    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-lg);
+    padding: var(--spacing-xs);
     cursor: pointer;
     border-radius: var(--radius-md);
     transition: background var(--transition-base), transform var(--transition-base);
@@ -277,8 +267,10 @@ body.sidebar-visible .sidebar {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 32px;
-    min-height: 32px;
+    min-width: 28px;
+    min-height: 28px;
+    flex-shrink: 0;
+    margin-left: var(--spacing-sm);
 }
 
 .sidebar-toggle:hover {
@@ -292,7 +284,7 @@ body.sidebar-visible .sidebar {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: var(--sidebar-padding-y) var(--offset-xs) var(--spacing-xl) var(--sidebar-padding-x);
+    padding: var(--sidebar-padding-y) var(--offset-xs) var(--spacing-md) var(--sidebar-padding-x);
 }
 
 .sidebar::-webkit-scrollbar {
@@ -313,13 +305,7 @@ body.sidebar-visible .sidebar {
     flex: 1 1 auto;
     overflow-y: auto;
     min-height: 0;
-    padding-bottom: var(--spacing-xl);
-    margin-bottom: var(--spacing-sm);
-}
-
-.sidebar-folders-bottom-spacer {
-    height: var(--sidebar-spacer-height);
-    flex-shrink: 0;
+    padding-bottom: var(--spacing-md);
 }
 
 
@@ -343,12 +329,22 @@ body.sidebar-visible .sidebar {
     align-items: stretch;
 }
 
-.sidebar-content .search-container,
+.sidebar-content .search-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.sidebar-content .search-container input {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
 .sidebar-content .sort-container {
     width: 100%;
 }
 
-.sidebar-content .search-container input,
 .sidebar-content .sort-container select {
     width: 100%;
     box-sizing: border-box;

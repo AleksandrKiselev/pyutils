@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 import fasteners
+from tqdm import tqdm
 
 from paths import get_relative_path, get_absolute_path, get_metadata_path, get_thumbnail_path
 from config import config
@@ -222,27 +223,31 @@ class MetadataStore:
 
         count = 0
         errors = 0
+        
+        # Собираем все файлы метаданных
+        metadata_files = []
+        for root, dirs, files in os.walk(metadata_dir):
+            for file in files:
+                if file.endswith(".json"):
+                    metadata_files.append(os.path.join(root, file))
 
         with self._rwlock.write_lock():
-            for root, dirs, files in os.walk(metadata_dir):
-                for file in files:
-                    if file.endswith(".json"):
-                        meta_path = os.path.join(root, file)
-                        try:
-                            with open(meta_path, "r", encoding="utf-8") as f:
-                                metadata = json.load(f)
-                                metadata_id = metadata.get("id")
-                                if metadata_id:
-                                    self._store[metadata_id] = metadata
-                                    image_path = metadata.get("image_path")
-                                    if image_path:
-                                        self._path_index[image_path] = metadata_id
-                                    count += 1
-                                else:
-                                    logger.warning(f"Метаданные без ID найдены в {meta_path}")
-                        except (json.JSONDecodeError, IOError) as e:
-                            logger.warning(f"Ошибка чтения метаданных {meta_path}: {e}")
-                            errors += 1
+            for meta_path in tqdm(metadata_files, desc="Загрузка метаданных", unit="файл"):
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        metadata = json.load(f)
+                        metadata_id = metadata.get("id")
+                        if metadata_id:
+                            self._store[metadata_id] = metadata
+                            image_path = metadata.get("image_path")
+                            if image_path:
+                                self._path_index[image_path] = metadata_id
+                            count += 1
+                        else:
+                            logger.warning(f"Метаданные без ID найдены в {meta_path}")
+                except (json.JSONDecodeError, IOError) as e:
+                    logger.warning(f"Ошибка чтения метаданных {meta_path}: {e}")
+                    errors += 1
 
         logger.info(f"Загружено метаданных: {count}, ошибок: {errors}")
 

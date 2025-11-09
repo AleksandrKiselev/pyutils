@@ -11,6 +11,7 @@ const folders = {
             if (incomingFolders) {
                 folderList.innerHTML = incomingFolders.innerHTML;
                 folders.rebindEventHandlers();
+                folders.restoreState();
                 folders.updateActiveHighlight();
             } else {
                 console.error("Папки не найдены в ответе");
@@ -29,6 +30,44 @@ const folders = {
         
         if (progressBar.taskId) {
             progressBar.blockNavigation();
+        }
+    },
+
+    getFolderPath(item) {
+        return item.getAttribute("data-folder-path") || "";
+    },
+
+    saveState() {
+        const collapsedPaths = new Set();
+        document.querySelectorAll(".folder-item.has-children").forEach(item => {
+            if (!item.classList.contains("expanded")) {
+                const path = folders.getFolderPath(item);
+                if (path) {
+                    collapsedPaths.add(path);
+                }
+            }
+        });
+        localStorage.setItem("folderTreeState", JSON.stringify(Array.from(collapsedPaths)));
+    },
+
+    restoreState() {
+        const raw = localStorage.getItem("folderTreeState");
+        if (!raw) return;
+
+        try {
+            const collapsedPaths = new Set(JSON.parse(raw));
+            document.querySelectorAll(".folder-item.has-children").forEach(item => {
+                const path = folders.getFolderPath(item);
+                if (path && collapsedPaths.has(path)) {
+                    item.classList.remove("expanded");
+                    const children = item.querySelector(".folder-children");
+                    if (children) {
+                        children.classList.add("hidden");
+                    }
+                }
+            });
+        } catch (e) {
+            console.warn("Не удалось восстановить состояние дерева:", e);
         }
     },
 
@@ -93,6 +132,7 @@ const folders = {
 
         const expanded = item.classList.toggle("expanded");
         children.classList.toggle("hidden", !expanded);
+        folders.saveState();
     }
 };
 
