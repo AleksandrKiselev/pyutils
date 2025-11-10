@@ -10,9 +10,10 @@ from flask import Blueprint, request, jsonify, render_template, send_from_direct
 
 from config import config
 from paths import build_folder_tree, get_absolute_path
-from services import ImageService, MetadataService, FavoritesService
+from services import ImageService, MetadataService, FavoritesService, BookmarksService
 from progress import progress_manager
 from image import collect_images, needs_processing
+from metadata import metadata_store
 
 logger = logging.getLogger(__name__)
 routes = Blueprint("routes", __name__)
@@ -287,3 +288,55 @@ def process_images():
 
     threading.Thread(target=process_task, daemon=True).start()
     return jsonify({"success": True, "task_id": task_id})
+
+
+@routes.route("/bookmarks", methods=["GET"])
+@handle_route_errors
+def get_bookmarks():
+    bookmarks = BookmarksService.get_all()
+    return jsonify(bookmarks)
+
+
+@routes.route("/bookmarks", methods=["POST"])
+@handle_route_errors
+def add_bookmark():
+    data = _validate_json_request()
+    metadata_id = data.get("id")
+    if not metadata_id or not isinstance(metadata_id, str):
+        raise ValueError("ID метаданных обязательно и должно быть строкой")
+    
+    metadata = MetadataService.get_by_id(metadata_id) if hasattr(MetadataService, "get_by_id") else None
+    if not metadata:
+        metadata = metadata_store.get_by_id(metadata_id)
+    if not metadata:
+        raise FileNotFoundError(f"Метаданные с ID {metadata_id} не найдены")
+    
+    image_data = {
+        "image_path": metadata.get("image_path", ""),
+        "prompt": metadata.get("prompt", ""),
+        "sort_by": data.get("sort_by", "date-desc"),
+        "search_query": data.get("search_query", "")
+    }
+    
+    BookmarksService.add(metadata_id, image_data)
+    return jsonify({"success": True})
+
+
+@routes.route("/bookmarks/<metadata_id>", methods=["DELETE"])
+@handle_route_errors
+def remove_bookmark(metadata_id: str):
+    if not metadata_id:
+        raise ValueError("ID метаданных обязательно")
+    
+    removed = BookmarksService.remove(metadata_id)
+    return jsonify({"success": True, "removed": removed})
+
+
+@routes.route("/bookmarks/<metadata_id>/has", methods=["GET"])
+@handle_route_errors
+def has_bookmark(metadata_id: str):
+    if not metadata_id:
+        raise ValueError("ID метаданных обязательно")
+    
+    has = BookmarksService.has(metadata_id)
+    return jsonify({"has": has})

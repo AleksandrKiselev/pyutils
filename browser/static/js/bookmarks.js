@@ -1,79 +1,89 @@
 const bookmarks = {
-    STORAGE_KEY: "fullscreenBookmarks",
+    _cache: null,
     
-    getAll() {
-        const raw = localStorage.getItem(this.STORAGE_KEY);
-        if (!raw) return [];
+    async getAll() {
+        if (this._cache !== null) {
+            return this._cache;
+        }
         try {
-            return JSON.parse(raw);
+            const response = await fetch("/bookmarks");
+            const data = await response.json();
+            this._cache = Array.isArray(data) ? data : [];
+            return this._cache;
         } catch (e) {
             console.warn("Ошибка чтения закладок:", e);
             return [];
         }
     },
     
-    save(bookmarksList) {
+    _clearCache() {
+        this._cache = null;
+    },
+    
+    async add(metadataId, imageData) {
         try {
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(bookmarksList));
+            const response = await utils.apiRequest("/bookmarks", {
+                method: "POST",
+                body: JSON.stringify({
+                    id: metadataId,
+                    sort_by: state.sortBy || "date-desc",
+                    search_query: state.searchQuery || ""
+                })
+            });
+            if (response.success) {
+                this._clearCache();
+                return true;
+            }
+            return false;
         } catch (e) {
-            console.error("Ошибка сохранения закладок:", e);
-        }
-    },
-    
-    add(metadataId, imageData) {
-        const all = this.getAll();
-        if (all.find(b => b.id === metadataId)) {
+            console.error("Ошибка добавления закладки:", e);
             return false;
         }
-        
-        const imagePath = imageData.image_path || "";
-        const pathParts = imagePath.split(/[/\\]/);
-        const filename = pathParts.pop() || "";
-        const folderPath = pathParts.join("/");
-        
-        const bookmark = {
-            id: metadataId,
-            imagePath: imagePath,
-            folderPath: folderPath,
-            prompt: imageData.prompt || "",
-            filename: filename,
-            timestamp: Date.now()
-        };
-        
-        all.push(bookmark);
-        this.save(all);
-        return true;
     },
     
-    remove(metadataId) {
-        const all = this.getAll();
-        const filtered = all.filter(b => b.id !== metadataId);
-        if (filtered.length === all.length) {
+    async remove(metadataId) {
+        try {
+            const response = await utils.apiRequest(`/bookmarks/${metadataId}`, {
+                method: "DELETE"
+            });
+            if (response.success) {
+                this._clearCache();
+                return response.removed || false;
+            }
+            return false;
+        } catch (e) {
+            console.error("Ошибка удаления закладки:", e);
             return false;
         }
-        this.save(filtered);
-        return true;
     },
     
-    has(metadataId) {
-        return this.getAll().some(b => b.id === metadataId);
+    async has(metadataId) {
+        try {
+            const response = await fetch(`/bookmarks/${metadataId}/has`);
+            const data = await response.json();
+            return data.has || false;
+        } catch (e) {
+            console.warn("Ошибка проверки закладки:", e);
+            return false;
+        }
     },
     
-    toggle(metadataId, imageData) {
-        if (this.has(metadataId)) {
-            this.remove(metadataId);
+    async toggle(metadataId, imageData) {
+        const hasBookmark = await this.has(metadataId);
+        if (hasBookmark) {
+            await this.remove(metadataId);
             return false;
         } else {
-            this.add(metadataId, imageData);
+            await this.add(metadataId, imageData);
             return true;
         }
     },
     
-    render() {
+    async render() {
         const container = DOM.bookmarksContainer;
         if (!container) return;
         
-        const all = this.getAll();
+        const all = await this.getAll();
         if (all.length === 0) {
             container.innerHTML = '<div class="bookmarks-empty">Нет закладок</div>';
             return;
@@ -83,11 +93,11 @@ const bookmarks = {
         all.forEach(bookmark => {
             const item = document.createElement("div");
             item.className = "bookmark-item";
-            item.dataset.id = bookmark.id;
+            item.dataset.id = bookmark.metadata_id;
             
             const content = document.createElement("div");
             content.className = "bookmark-content";
-            content.onclick = () => this.openFromBookmark(bookmark.id);
+            content.onclick = () => this.openFromBookmark(bookmark.metadata_id);
             
             const filename = document.createElement("div");
             filename.className = "bookmark-filename";
@@ -107,9 +117,9 @@ const bookmarks = {
             removeBtn.className = "bookmark-remove";
             removeBtn.title = "Удалить закладку";
             removeBtn.textContent = "✕";
-            removeBtn.onclick = (e) => {
+            removeBtn.onclick = async (e) => {
                 e.stopPropagation();
-                this.removeFromList(bookmark.id);
+                await this.removeFromList(bookmark.metadata_id);
             };
             
             item.appendChild(content);
@@ -119,20 +129,26 @@ const bookmarks = {
     },
     
     async openFromBookmark(metadataId) {
-        const all = this.getAll();
-        const bookmark = all.find(b => b.id === metadataId);
+        const all = await this.getAll();
+        const bookmark = all.find(b => b.metadata_id === metadataId);
         if (!bookmark) {
             toast.show("Закладка не найдена", "");
             return;
         }
         
-        const targetFolderPath = bookmark.folderPath || "";
+        const targetFolderPath = bookmark.folder_path || "";
         const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
+        const bookmarkSortBy = bookmark.sort_by || state.sortBy || "date-desc";
+        const currentSortBy = state.sortBy || "date-desc";
+        const bookmarkSearchQuery = bookmark.search_query || "";
+        const currentSearchQuery = state.searchQuery || "";
         
         const currentImages = state.currentImages || [];
         let index = currentImages.findIndex(img => img.id === metadataId);
         
-        if (index === -1 || currentPath !== targetFolderPath) {
+        const needReload = index === -1 || currentPath !== targetFolderPath || bookmarkSortBy !== currentSortBy || bookmarkSearchQuery !== currentSearchQuery;
+        
+        if (needReload) {
             if (currentPath !== targetFolderPath) {
                 if (progressBar && progressBar.taskId) {
                     toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
@@ -158,11 +174,22 @@ const bookmarks = {
                 }
             }
             
+            if (bookmarkSortBy !== currentSortBy && DOM.sortSelect) {
+                state.sortBy = bookmarkSortBy;
+                DOM.sortSelect.value = bookmarkSortBy;
+            }
+            
+            if (bookmarkSearchQuery !== currentSearchQuery) {
+                state.searchQuery = bookmarkSearchQuery;
+                if (DOM.searchBox) {
+                    DOM.searchBox.value = bookmarkSearchQuery;
+                }
+            }
+            
             try {
-                const [sort, order] = (state.sortBy || "date-desc").split("-");
-                const searchQuery = state.searchQuery || "";
+                const [sort, order] = bookmarkSortBy.split("-");
                 const path = targetFolderPath ? `/${targetFolderPath}` : "";
-                const query = `/images${path}?limit=1000&offset=0&search=${encodeURIComponent(searchQuery)}&sort_by=${sort}&order=${order}`;
+                const query = `/images${path}?limit=1000&offset=0&search=${encodeURIComponent(bookmarkSearchQuery)}&sort_by=${sort}&order=${order}`;
                 const response = await fetch(query);
                 const images = await response.json();
                 
@@ -194,6 +221,13 @@ const bookmarks = {
                         const imgMetadataId = img?.id || "";
                         rating.updateStars(null, imgMetadataId, img?.rating || 0);
                     });
+                    
+                    requestAnimationFrame(() => {
+                        const container = document.querySelector(`.image-checkbox[data-id="${metadataId}"]`)?.closest(".image-container");
+                        if (container) {
+                            container.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }
+                    });
                 }
             } catch (error) {
                 console.error("Ошибка загрузки изображений:", error);
@@ -208,16 +242,21 @@ const bookmarks = {
             return;
         }
         
+        const container = document.querySelector(`.image-checkbox[data-id="${metadataId}"]`)?.closest(".image-container");
+        if (container) {
+            container.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        
         fullscreen.open(index);
     },
     
-    removeFromList(metadataId) {
-        this.remove(metadataId);
-        this.render();
+    async removeFromList(metadataId) {
+        await this.remove(metadataId);
+        await this.render();
         toast.show("Закладка удалена", "");
     },
     
-    toggleFromFullscreen() {
+    async toggleFromFullscreen() {
         const data = state.currentImages[state.currentIndex];
         if (!data) return;
         
@@ -230,14 +269,14 @@ const bookmarks = {
             return;
         }
         
-        const isAdded = this.toggle(metadataId, data);
-        this.updateFullscreenButton(metadataId);
-        this.render();
+        const isAdded = await this.toggle(metadataId, data);
+        await this.updateFullscreenButton(metadataId);
+        await this.render();
         
         toast.show(isAdded ? "Закладка добавлена" : "Закладка удалена", "");
     },
     
-    updateFullscreenButton(metadataId) {
+    async updateFullscreenButton(metadataId) {
         const btn = DOM.fullscreenBookmarkBtn;
         if (!btn) return;
         
@@ -248,7 +287,7 @@ const bookmarks = {
         }
         
         btn.style.display = "";
-        const hasBookmark = this.has(metadataId);
+        const hasBookmark = await this.has(metadataId);
         btn.classList.toggle("active", hasBookmark);
         btn.title = hasBookmark ? "Удалить закладку" : "Добавить закладку";
     }

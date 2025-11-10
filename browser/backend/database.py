@@ -66,6 +66,21 @@ class DatabaseManager:
             cursor.execute("CREATE INDEX idx_image_path ON metadata(image_path)")
             cursor.execute("CREATE INDEX idx_checked ON metadata(checked)")
             cursor.execute("CREATE INDEX idx_rating ON metadata(rating)")
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS bookmarks (
+                    id TEXT PRIMARY KEY,
+                    metadata_id TEXT NOT NULL,
+                    image_path TEXT NOT NULL,
+                    folder_path TEXT NOT NULL DEFAULT '',
+                    prompt TEXT NOT NULL DEFAULT '',
+                    filename TEXT NOT NULL DEFAULT '',
+                    sort_by TEXT NOT NULL DEFAULT 'date-desc',
+                    search_query TEXT NOT NULL DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookmarks_metadata_id ON bookmarks(metadata_id)")
             self._memory_conn.commit()
     
     def _get_db_path(self) -> str:
@@ -128,6 +143,24 @@ class DatabaseManager:
                 disk_conn.backup(self._memory_conn)
             
             mem_cursor = self._memory_conn.cursor()
+            mem_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='bookmarks'")
+            if not mem_cursor.fetchone():
+                mem_cursor.execute("""
+                    CREATE TABLE bookmarks (
+                        id TEXT PRIMARY KEY,
+                        metadata_id TEXT NOT NULL,
+                        image_path TEXT NOT NULL,
+                        folder_path TEXT NOT NULL DEFAULT '',
+                        prompt TEXT NOT NULL DEFAULT '',
+                        filename TEXT NOT NULL DEFAULT '',
+                        sort_by TEXT NOT NULL DEFAULT 'date-desc',
+                        search_query TEXT NOT NULL DEFAULT '',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                mem_cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookmarks_metadata_id ON bookmarks(metadata_id)")
+                self._memory_conn.commit()
+            
             mem_cursor.execute("SELECT COUNT(*) FROM metadata")
             row = mem_cursor.fetchone()
             row_count = row[0] if row else 0
@@ -387,3 +420,71 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Ошибка удаления метаданных: {e}")
             raise
+    
+    def get_bookmarks(self) -> List[Dict[str, Any]]:
+        """Получает все закладки"""
+        if self._memory_conn is None:
+            return []
+        try:
+            cursor = self._memory_conn.cursor()
+            cursor.execute("SELECT * FROM bookmarks ORDER BY created_at DESC")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Ошибка получения закладок: {e}")
+            return []
+    
+    def add_bookmark(self, bookmark: Dict[str, Any]) -> None:
+        """Добавляет закладку"""
+        if self._memory_conn is None:
+            return
+        try:
+            cursor = self._memory_conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO bookmarks 
+                (id, metadata_id, image_path, folder_path, prompt, filename, sort_by, search_query)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                bookmark.get("id"),
+                bookmark.get("metadata_id"),
+                bookmark.get("image_path", ""),
+                bookmark.get("folder_path", ""),
+                bookmark.get("prompt", ""),
+                bookmark.get("filename", ""),
+                bookmark.get("sort_by", "date-desc"),
+                bookmark.get("search_query", "")
+            ))
+            self._memory_conn.commit()
+            self._schedule_save()
+        except Exception as e:
+            logger.error(f"Ошибка добавления закладки: {e}")
+            raise
+    
+    def remove_bookmark(self, metadata_id: str) -> bool:
+        """Удаляет закладку по metadata_id. Возвращает True если закладка была удалена"""
+        if self._memory_conn is None:
+            return False
+        try:
+            cursor = self._memory_conn.cursor()
+            cursor.execute("DELETE FROM bookmarks WHERE metadata_id = ?", (metadata_id,))
+            self._memory_conn.commit()
+            if cursor.rowcount > 0:
+                self._schedule_save()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Ошибка удаления закладки: {e}")
+            raise
+    
+    def has_bookmark(self, metadata_id: str) -> bool:
+        """Проверяет наличие закладки по metadata_id"""
+        if self._memory_conn is None:
+            return False
+        try:
+            cursor = self._memory_conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM bookmarks WHERE metadata_id = ?", (metadata_id,))
+            row = cursor.fetchone()
+            return row[0] > 0 if row else False
+        except Exception as e:
+            logger.warning(f"Ошибка проверки закладки: {e}")
+            return False

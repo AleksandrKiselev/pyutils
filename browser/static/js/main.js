@@ -48,7 +48,7 @@ window.onload = function () {
     if (DOM.scrollToTop) DOM.scrollToTop.classList.add("hidden");
     
     if (typeof bookmarks !== "undefined") {
-        bookmarks.render();
+        bookmarks.render().catch(console.error);
     }
 
     if (DOM.menuToggle) {

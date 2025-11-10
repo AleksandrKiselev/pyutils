@@ -11,6 +11,7 @@ from metadata import metadata_store
 from image import collect_images, filter_images, sort_images
 from thumbnail import ThumbnailService
 from config import config
+from database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -118,3 +119,37 @@ class FavoritesService:
         new_metadata["tags"] = sorted(tags)
 
         metadata_store.save([new_metadata])
+
+
+class BookmarksService:
+    @staticmethod
+    def get_all() -> List[Dict]:
+        return metadata_store._db_manager.get_bookmarks()
+    
+    @staticmethod
+    def add(metadata_id: str, image_data: Dict) -> None:
+        image_path = image_data.get("image_path", "")
+        path_parts = image_path.split("/") if "/" in image_path else image_path.split("\\")
+        filename = path_parts[-1] if path_parts else ""
+        folder_path = "/".join(path_parts[:-1]) if len(path_parts) > 1 else ""
+        
+        bookmark = {
+            "id": str(uuid.uuid4()),
+            "metadata_id": metadata_id,
+            "image_path": image_path,
+            "folder_path": folder_path,
+            "prompt": image_data.get("prompt", ""),
+            "filename": filename,
+            "sort_by": image_data.get("sort_by", "date-desc"),
+            "search_query": image_data.get("search_query", "")
+        }
+        
+        metadata_store._db_manager.add_bookmark(bookmark)
+    
+    @staticmethod
+    def remove(metadata_id: str) -> bool:
+        return metadata_store._db_manager.remove_bookmark(metadata_id)
+    
+    @staticmethod
+    def has(metadata_id: str) -> bool:
+        return metadata_store._db_manager.has_bookmark(metadata_id)
