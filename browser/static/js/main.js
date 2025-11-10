@@ -50,6 +50,10 @@ window.onload = function () {
     if (typeof bookmarks !== "undefined") {
         bookmarks.render().catch(console.error);
     }
+    
+    if (typeof sidebarResize !== "undefined") {
+        sidebarResize.init().catch(console.error);
+    }
 
     if (DOM.menuToggle) {
         DOM.menuToggle.addEventListener("click", ui.closeSidebar);

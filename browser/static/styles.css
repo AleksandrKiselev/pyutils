@@ -240,7 +240,7 @@ body.no-transition .sidebar {
     padding: 0;
     color: var(--text-color);
     transform: translateX(-100%);
-    transition: transform var(--transition-slow), box-shadow var(--transition-slow);
+    transition: transform var(--transition-slow), box-shadow var(--transition-slow), width var(--transition-base);
     box-shadow: var(--shadow-sidebar);
     display: flex;
     flex-direction: column;
@@ -252,6 +252,26 @@ body.no-transition .sidebar {
 body.sidebar-visible .sidebar {
     transform: translateX(0);
     box-shadow: var(--shadow-sidebar);
+}
+
+.sidebar-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: calc(var(--z-sidebar) + 1);
+    background: transparent;
+    transition: background var(--transition-base);
+}
+
+.sidebar-resize-handle:hover {
+    background: rgba(255, 152, 0, 0.3);
+}
+
+.sidebar-resize-handle:active {
+    background: rgba(255, 152, 0, 0.5);
 }
 
 .sidebar-toggle {
