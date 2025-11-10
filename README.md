@@ -1,20 +1,51 @@
 # neural-networks
 
-## Установка
+Окружение conda для работы с нейронными сетями и машинным обучением. Включает:
+- **PyTorch** с поддержкой CUDA для обучения моделей глубокого обучения
+- **Классификация изображений** (cat_classifier, MNIST)
+- **Веб-приложение** для просмотра и управления коллекцией изображений (browser)
+- **Утилиты** для работы с метаданными, промптами и датасетами
+- **Обработка изображений** (OpenCV, Pillow) и извлечение метаданных
+
+## Установка, активация и деактивация
 
 ```bash
 conda env create -f environment.yml
 conda activate neural-networks
+conda deactivate
 ```
 
-## Запуск browser
+### Просмотр информации
 
-**VSCode/Cursor:** `F5` (запуск с отладкой)
-
-**Терминал:**
 ```bash
-cd browser
-python app.py
+conda env list
+conda list
 ```
 
-Приложение доступно на `http://127.0.0.1:5000`
+### Добавление пакета в environment.yml
+
+```bash
+conda activate neural-networks
+conda install package_name  # Предпочтительно, если пакет есть в conda
+pip install package_name    # Если пакета нет в conda или нужна другая версия
+```
+
+### Экспорт окружения
+
+```bash
+conda env export > environment.yml
+```
+
+### Обновление
+
+```bash
+conda update --all
+conda update package_name
+```
+
+### Удаление
+
+```bash
+conda env remove -n neural-networks  # Удалить всё окружение целиком
+conda remove package_name            # Удалить конкретный пакет из текущего окружения
+```
