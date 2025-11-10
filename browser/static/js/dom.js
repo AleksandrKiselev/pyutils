@@ -14,11 +14,13 @@ const DOM = {
     fullscreenTagsDisplay: document.getElementById("fullscreen-tags-display"),
     fullscreenRating: document.getElementById("fullscreen-rating"),
     fullscreenFilename: document.getElementById("fullscreen-filename"),
+    fullscreenBookmarkBtn: document.getElementById("fullscreen-bookmark-btn"),
     toast: document.getElementById("toast"),
     progressContainer: document.getElementById("progress-container"),
     progressBar: document.getElementById("progress-bar"),
     progressMessage: document.getElementById("progress-message"),
     progressText: document.getElementById("progress-text"),
-    progressPercentage: document.getElementById("progress-percentage")
+    progressPercentage: document.getElementById("progress-percentage"),
+    bookmarksContainer: document.getElementById("bookmarks-container")
 };
 

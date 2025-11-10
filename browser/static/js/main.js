@@ -11,6 +11,7 @@ window.nextImage = fullscreen.next;
 window.deleteFullscreen = fullscreen.delete;
 window.copyPromptFullscreen = fullscreen.copyPrompt;
 window.copyToFavoritesFullscreen = favorites.copyFromFullscreen;
+window.toggleBookmarkFullscreen = bookmarks.toggleFromFullscreen.bind(bookmarks);
 window.deleteThumbnail = gallery.deleteThumbnail;
 window.setRating = rating.set;
 window.showStars = rating.showStars;
@@ -45,6 +46,10 @@ window.onload = function () {
 
     navigation.loadContent();
     if (DOM.scrollToTop) DOM.scrollToTop.classList.add("hidden");
+    
+    if (typeof bookmarks !== "undefined") {
+        bookmarks.render();
+    }
 
     if (DOM.menuToggle) {
         DOM.menuToggle.addEventListener("click", ui.closeSidebar);

@@ -67,6 +67,10 @@ const fullscreen = {
 
         fullscreen.setupCheckboxHandler(data, miniCheckbox, wrapper);
         fullscreen.setupRatingHandler(data);
+        
+        if (typeof bookmarks !== "undefined") {
+            bookmarks.updateFullscreenButton(metadataId);
+        }
     },
 
     setupCheckboxHandler(data, miniCheckbox, wrapper) {

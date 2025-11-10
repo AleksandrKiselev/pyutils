@@ -42,7 +42,16 @@
                     </div>
                 </div>
             </div>
+            <div class="sidebar-bookmarks">
+                <div class="sidebar-section-header">
+                    <span>🔖 Закладки</span>
+                </div>
+                <div id="bookmarks-container" class="bookmarks-container"></div>
+            </div>
             <div class="sidebar-folders">
+                <div class="sidebar-section-header">
+                    <span>📁 Папки</span>
+                </div>
                 {% macro render_tree(tree) %}
                 <ul class="folder-tree">
                     {% for path, node in tree.items() %}
@@ -102,6 +111,7 @@
             <div class="image-buttons fullscreen-buttons">
                 <button class="copy-btn" onclick="copyPromptFullscreen()" title="Копировать промпт">⧉</button>
                 <button class="copy-favorites-btn" onclick="copyToFavoritesFullscreen()" title="В избранное">★</button>
+                <button id="fullscreen-bookmark-btn" class="bookmark-btn" onclick="toggleBookmarkFullscreen()" title="Добавить закладку">🔖</button>
                 <input type="checkbox" id="fullscreen-checkbox" class="image-checkbox" title="Выбрать">
                 <button class="delete-btn" onclick="deleteFullscreen()" title="Удалить">✕</button>
             </div>
@@ -132,6 +142,7 @@
     <script src="/static/js/rating.js"></script>
     <script src="/static/js/clipboard.js"></script>
     <script src="/static/js/favorites.js"></script>
+    <script src="/static/js/bookmarks.js"></script>
     <script src="/static/js/folders.js"></script>
     <script src="/static/js/gallery.js"></script>
     <script src="/static/js/fullscreen.js"></script>
