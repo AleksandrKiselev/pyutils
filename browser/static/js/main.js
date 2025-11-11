@@ -6,6 +6,7 @@ window.toggleFolder = folders.toggle;
 window.scrollToTop = ui.scrollToTop;
 window.uncheckAllCheckboxes = gallery.uncheckAll;
 window.deleteCheckedImages = gallery.deleteCheckedImages;
+window.downloadUncheckedPrompts = gallery.downloadUncheckedPrompts;
 window.prevImage = fullscreen.prev;
 window.nextImage = fullscreen.next;
 window.deleteFullscreen = fullscreen.delete;

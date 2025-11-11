@@ -913,12 +913,25 @@ body.sidebar-visible .sidebar {
     background-color: var(--btn-reset-bg);
     color: var(--btn-reset-color);
     border: var(--border-width-base) solid var(--btn-reset-border);
-    font-size: var(--font-size-md);
-    padding: var(--offset-sm) var(--spacing-lg);
+    font-size: var(--font-size-lg);
+    padding: 0;
+    min-width: 2.5em;
+    height: 2.5em;
     border-radius: var(--radius-md);
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: background var(--transition-slow), color var(--transition-slow), transform var(--transition-base), box-shadow var(--transition-base);
     box-shadow: 0 2px 4px rgba(255, 100, 100, 0.2);
+    position: relative;
+}
+
+.reset-checkboxes-btn.icon-reset::before {
+    content: "↻";
+    font-size: 1.5em;
+    line-height: 1;
+    font-family: Arial, sans-serif;
 }
 
 .reset-checkboxes-btn:hover {
@@ -932,15 +945,61 @@ body.sidebar-visible .sidebar {
     background-color: var(--btn-reset-bg);
     color: var(--btn-reset-color);
     border: var(--border-width-base) solid var(--btn-reset-border);
-    font-size: var(--font-size-md);
-    padding: var(--offset-sm) var(--spacing-lg);
+    font-size: var(--font-size-lg);
+    padding: 0;
+    min-width: 2.5em;
+    height: 2.5em;
     border-radius: var(--radius-md);
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: background var(--transition-slow), color var(--transition-slow), transform var(--transition-base), box-shadow var(--transition-base);
     box-shadow: 0 2px 4px rgba(255, 100, 100, 0.2);
+    position: relative;
+}
+
+.delete-metadata-btn.icon-delete::before {
+    content: "×";
+    font-size: 1.8em;
+    line-height: 1;
+    font-weight: bold;
+    font-family: Arial, sans-serif;
 }
 
 .delete-metadata-btn:hover {
+    background-color: var(--btn-reset-hover-bg);
+    color: var(--btn-reset-hover-color);
+    transform: scale(var(--button-reset-hover-scale));
+    box-shadow: 0 4px 8px rgba(255, 100, 100, 0.3);
+}
+
+.download-prompts-btn {
+    background-color: var(--btn-reset-bg);
+    color: var(--btn-reset-color);
+    border: var(--border-width-base) solid var(--btn-reset-border);
+    font-size: var(--font-size-lg);
+    padding: 0;
+    min-width: 2.5em;
+    height: 2.5em;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition-slow), color var(--transition-slow), transform var(--transition-base), box-shadow var(--transition-base);
+    box-shadow: 0 2px 4px rgba(255, 100, 100, 0.2);
+    position: relative;
+}
+
+.download-prompts-btn.icon-download::before {
+    content: "↓";
+    font-size: 1.5em;
+    line-height: 1;
+    font-family: Arial, sans-serif;
+}
+
+.download-prompts-btn:hover {
     background-color: var(--btn-reset-hover-bg);
     color: var(--btn-reset-hover-color);
     transform: scale(var(--button-reset-hover-scale));

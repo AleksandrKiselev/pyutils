@@ -359,6 +359,59 @@ const gallery = {
 
     setHoveredPrompt(prompt) {
         state.lastHoveredPrompt = prompt;
+    },
+
+    async downloadUncheckedPrompts() {
+        // Блокируем скачивание во время генерации метаданных
+        if (progressBar.taskId) {
+            toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
+            return;
+        }
+
+        const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
+        const searchQuery = state.searchQuery || "";
+        const [sort, order] = state.sortBy.split("-");
+
+        try {
+            const result = await utils.apiRequest("/get_unchecked_prompts", {
+                body: JSON.stringify({ 
+                    path: currentPath, 
+                    search: searchQuery,
+                    sort_by: sort,
+                    order: order
+                })
+            });
+
+            if (!result.success || !result.prompts) {
+                toast.show("Ошибка получения промптов", null, 3000);
+                return;
+            }
+
+            const prompts = result.prompts.filter(p => p && p.trim()); // Фильтруем пустые промпты
+
+            if (prompts.length === 0) {
+                toast.show("Нет неотмеченных изображений", null, 3000);
+                return;
+            }
+
+            // Создаем содержимое файла (каждый промпт с новой строки)
+            const content = prompts.join("\n");
+            
+            // Создаем blob и скачиваем файл
+            const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `prompts_${new Date().toISOString().slice(0, 10)}.txt`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            toast.show(`Скачано промптов: ${prompts.length}`, null, 3000);
+        } catch (error) {
+            utils.showError("Ошибка скачивания промптов", error);
+        }
     }
 };
 

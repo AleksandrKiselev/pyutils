@@ -14,7 +14,7 @@
                     <div class="search-container">
                         <input type="text" id="search-box" placeholder="Поиск (Enter)" title="text | g:text | t:tag1,tag2 | g:t:tag1,tag2 | dh: | dp:">
                         <button id="menu-toggle" class="sidebar-toggle" title="Закрыть панель">
-                            <span id="menu-icon">⯇</span>
+                            <span id="menu-icon">◀</span>
                         </button>
                     </div>
                     <div class="sort-container">
@@ -37,8 +37,9 @@
                         </select>
                     </div>
                     <div class="reset-and-folder">
-                        <button onclick="uncheckAllCheckboxes()" class="reset-checkboxes-btn" title="Снять выделение">✅Снять</button>
-                        <button onclick="deleteCheckedImages()" class="delete-metadata-btn" title="Удалить отмеченные изображения">🗑️Удалить</button>
+                        <button onclick="uncheckAllCheckboxes()" class="reset-checkboxes-btn icon-reset" title="Снять выделение"></button>
+                        <button onclick="deleteCheckedImages()" class="delete-metadata-btn icon-delete" title="Удалить отмеченные изображения"></button>
+                        <button onclick="downloadUncheckedPrompts()" class="download-prompts-btn icon-download" title="Скачать промпты неотмеченных изображений"></button>
                     </div>
                 </div>
             </div>
@@ -82,7 +83,7 @@
 
     <div class="container">
         <button id="menu-toggle-floating" class="menu-toggle-floating" title="Открыть панель">
-            <span id="menu-icon-floating">⯈</span>
+            <span id="menu-icon-floating">▶</span>
         </button>
 
         <div id="scroll-buttons">

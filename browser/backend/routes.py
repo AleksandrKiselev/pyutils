@@ -236,6 +236,26 @@ def delete_checked_images():
     return jsonify({"success": True, "count": count})
 
 
+@routes.route("/get_unchecked_prompts", methods=["POST"])
+@handle_route_errors
+def get_unchecked_prompts():
+    data = _validate_json_request()
+    search_folder_path, search = _get_validated_path_and_search(data)
+    
+    sort_by = data.get("sort_by", "date")
+    order = data.get("order", "desc")
+    valid_sort_fields = {"date", "filename", "prompt", "rating", "tags", "size", "hash", "random"}
+    valid_orders = {"asc", "desc"}
+    
+    if sort_by not in valid_sort_fields:
+        sort_by = "date"
+    if order not in valid_orders:
+        order = "desc"
+    
+    prompts = ImageService.get_unchecked_prompts(search_folder_path, search, sort_by, order)
+    return jsonify({"success": True, "prompts": prompts})
+
+
 @routes.route("/check_processing_needed", methods=["POST"])
 @handle_route_errors
 def check_processing_needed():

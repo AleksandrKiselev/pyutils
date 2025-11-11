@@ -107,6 +107,28 @@ class ImageService:
         
         return len(ids_to_delete_metadata)
 
+    @staticmethod
+    def get_unchecked_prompts(folder_path: Optional[str], search: str, sort_by: str = "date", order: str = "desc") -> List[str]:
+        """Получает промпты всех неотмеченных изображений с учетом сортировки"""
+        images = _get_filtered_images(folder_path, search)
+        # Фильтруем неотмеченные
+        unchecked_images = [
+            img for img in images 
+            if not img.get("checked", False)
+        ]
+        # Сортируем
+        if sort_by == "random":
+            if unchecked_images:
+                unchecked_images = random.sample(unchecked_images, len(unchecked_images))
+        else:
+            unchecked_images = sort_images(unchecked_images, sort_by, order)
+        # Извлекаем промпты
+        unchecked_prompts = [
+            img.get("prompt", "") for img in unchecked_images 
+            if img.get("prompt")
+        ]
+        return unchecked_prompts
+
 
 class MetadataService:
     @staticmethod
