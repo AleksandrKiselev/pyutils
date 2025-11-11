@@ -139,8 +139,20 @@ def filter_images(images, search):
 
         return [img for img in images if match(img.get("tags", []))]
 
-    if search.startswith(("duplicates:", "duplicate:", "d:")):
+    if search.startswith("dh:"):
         hash_counts = Counter(img.get("hash", "") for img in images if img.get("hash"))
         return [img for img in images if img.get("hash") and hash_counts[img.get("hash")] > 1]
+
+    if search.startswith("dp:"):
+        prompt_counts = Counter(img.get("prompt", "").strip().lower() for img in images if img.get("prompt", "").strip())
+        duplicate_prompts = {prompt for prompt, count in prompt_counts.items() if count > 1}
+        result = []
+        for img in images:
+            prompt = img.get("prompt", "").strip().lower()
+            if prompt in duplicate_prompts:
+                result.append(img)
+        # Сортируем по промпту, чтобы одинаковые промпты шли рядом (попарно)
+        result.sort(key=lambda img: img.get("prompt", "").strip().lower())
+        return result
 
     return [img for img in images if search in img.get("prompt", "").lower()]
