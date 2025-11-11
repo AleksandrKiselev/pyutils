@@ -178,7 +178,8 @@ const gallery = {
             const thumbnailPath = img?.thumb_path || "";
             const imagePath = img?.image_path || "";
             
-            const prompt = utils.escapeJS(img.prompt || "");
+            const promptText = img.prompt || "";
+            const prompt = utils.escapeJS(promptText || "промпт не найден");
             const metadataIdEscaped = utils.escapeJS(metadataId);
             const metadataIdAttrEscaped = metadataId ? metadataId.replace(/"/g, "&quot;").replace(/'/g, "&#39;") : "";
             const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
@@ -201,7 +202,7 @@ const gallery = {
                 <div class="image-container" onclick="fullscreen.open(${baseIndex + index})"
                      onmouseenter="rating.showStars(event)" onmouseleave="rating.hideStars(event)" ${aspectRatioStyle}>
                     <div class="image-buttons">
-                        <button class="copy-btn" onclick="clipboard.copy(event, '${prompt}')" title="Копировать промпт">⧉</button>
+                        <button class="copy-btn" onclick="clipboard.copy(event, '${utils.escapeJS(promptText)}')" title="Копировать промпт">⧉</button>
                         <button class="copy-favorites-btn" onclick="favorites.copy(event, '${metadataIdEscaped}')" title="В избранное">★</button>
                         <input type="checkbox" class="image-checkbox" data-id="${metadataIdAttrEscaped}"
                                onclick="event.stopPropagation(); gallery.saveCheckboxState(event);" title="Выбрать">

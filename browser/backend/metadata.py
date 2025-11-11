@@ -61,13 +61,13 @@ class MetadataStore:
             metadata = "".join(chunks).strip()
             pattern = r'"title"\s*:\s*"PromptTextForBrowser",.*?"widgets_values"\s*:\s*\[\s*\[\s*"([^"]+)"\s*\]\s*\]'
             match = re.search(pattern, metadata, re.DOTALL)
-            return match.group(1).strip() if match else "Метаданные не найдены"
+            return match.group(1).strip() if match else ""
         except IOError as e:
             logger.error(f"Ошибка чтения файла {image_path}: {e}")
-            return "Метаданные не найдены"
+            return ""
         except Exception as e:
             logger.error(f"Ошибка получения промпта из {image_path}: {e}")
-            return "Метаданные не найдены"
+            return ""
 
     def _calculate_file_hash(self, image_path: str) -> str:
         try:
@@ -143,7 +143,7 @@ class MetadataStore:
             logger.warning(f"Ошибка извлечения тегов из {image_path}: {e}")
         
         return {
-            "prompt": prompt or "Метаданные не найдены",
+            "prompt": prompt or "",
             "checked": False,
             "rating": 0,
             "tags": tags if isinstance(tags, list) else [],

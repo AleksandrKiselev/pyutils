@@ -43,8 +43,9 @@ const fullscreen = {
         if (DOM.fullscreenImg) DOM.fullscreenImg.src = `/serve_image/${imagePath}`;
 
         if (DOM.fullscreenPrompt) {
-            DOM.fullscreenPrompt.dataset.prompt = data.prompt;
-            DOM.fullscreenPrompt.textContent = data.prompt || "";
+            const promptText = data.prompt || "";
+            DOM.fullscreenPrompt.dataset.prompt = promptText;
+            DOM.fullscreenPrompt.textContent = promptText || "промпт не найден";
         }
 
         const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
