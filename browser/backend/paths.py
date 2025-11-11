@@ -27,6 +27,37 @@ def _count_images_in_dir(dir_path: str) -> int:
         return 0
 
 
+def count_images_in_dir(dir_path: str, metadata_store) -> Tuple[int, int]:
+    """Подсчитывает общее количество и количество неотмеченных изображений в директории.
+    Возвращает (total_count, unchecked_count)"""
+    try:
+        image_paths = [
+            entry.path for entry in os.scandir(dir_path)
+            if entry.is_file() and os.path.splitext(entry.name)[1].lower() in config.ALLOWED_EXTENSIONS
+        ]
+        if not image_paths:
+            return (0, 0)
+        
+        total_count = len(image_paths)
+        
+        # Получаем метаданные для всех изображений в папке
+        metadata_list = metadata_store.get_by_paths(image_paths)
+        
+        # Считаем неотмеченные (checked=False или отсутствуют метаданные)
+        unchecked_count = 0
+        for metadata in metadata_list:
+            if metadata is None:
+                # Если метаданных нет, считаем как неотмеченное
+                unchecked_count += 1
+            elif not metadata.get("checked", False):
+                unchecked_count += 1
+        
+        return (total_count, unchecked_count)
+    except OSError as e:
+        logger.warning(f"Ошибка подсчета изображений в {dir_path}: {e}")
+        return (0, 0)
+
+
 def get_thumbnail_path(image_path: str) -> str:
     rel_path = get_relative_path(image_path)
     rel_dir = PathLib(rel_path).parent
@@ -106,7 +137,7 @@ def walk_images(root_folder: Optional[str] = None) -> Iterator[str]:
         raise OSError(f"Не удалось обойти дерево директорий: {e}") from e
 
 
-def build_folder_tree(base_path: str, relative: str = "") -> Dict[str, Any]:
+def build_folder_tree(base_path: str, relative: str, metadata_store) -> Dict[str, Any]:
     tree: Dict[str, Any] = {}
     full_path = os.path.join(base_path, relative)
 
@@ -116,13 +147,14 @@ def build_folder_tree(base_path: str, relative: str = "") -> Dict[str, Any]:
                 continue
 
             rel_path = os.path.join(relative, entry.name).replace("\\", "/")
-            image_count = _count_images_in_dir(entry.path)
-            children = build_folder_tree(base_path, rel_path)
+            total_count, unchecked_count = count_images_in_dir(entry.path, metadata_store)
+            children = build_folder_tree(base_path, rel_path, metadata_store)
 
-            if image_count > 0 or children:
+            if total_count > 0 or children:
                 tree[rel_path] = {
                     "name": entry.name,
-                    "count": image_count,
+                    "total": total_count,
+                    "unchecked": unchecked_count,
                     "children": children
                 }
     except OSError as e:

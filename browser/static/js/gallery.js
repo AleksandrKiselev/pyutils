@@ -205,7 +205,7 @@ const gallery = {
                         <button class="copy-btn" onclick="clipboard.copy(event, '${utils.escapeJS(promptText)}')" title="Копировать промпт">⧉</button>
                         <button class="copy-favorites-btn" onclick="favorites.copy(event, '${metadataIdEscaped}')" title="В избранное">★</button>
                         <input type="checkbox" class="image-checkbox" data-id="${metadataIdAttrEscaped}"
-                               onclick="event.stopPropagation(); gallery.saveCheckboxState(event);" title="Выбрать">
+                               onclick="event.stopPropagation();" title="Выбрать">
                         <button class="delete-btn" onclick="gallery.deleteThumbnail(event, '${metadataIdEscaped}')" title="Удалить">✕</button>
                     </div>
                     <div class="image-rating" style="opacity: 0;">
@@ -262,9 +262,19 @@ const gallery = {
 
     saveCheckboxState(event) {
         const cb = event.target;
+        const img = utils.findImageById(cb.dataset.id);
+        const imagePath = img?.image_path || "";
+        const folderPath = folders.getFolderPathFromImagePath(imagePath);
+        
         utils.apiRequest("/update_metadata", {
             body: JSON.stringify({ id: cb.dataset.id, checked: cb.checked })
         }).catch(console.error);
+        
+        // Обновляем счетчик папки на клиенте
+        if (folderPath) {
+            const delta = cb.checked ? -1 : 1; // Если чекнули, уменьшаем на 1, если сняли - увеличиваем на 1
+            folders.updateFolderCountAndParents(folderPath, delta);
+        }
     },
 
     loadCheckboxState() {
@@ -300,17 +310,31 @@ const gallery = {
             });
 
             if (result.success) {
+                // Подсчитываем, сколько изображений было отмечено (до снятия чекбоксов)
+                let checkedCount = 0;
+                const checkedImages = new Set();
+                
+                state.currentImages.forEach(img => {
+                    if (img && img.checked) {
+                        checkedCount++;
+                        checkedImages.add(img.id);
+                        img.checked = false;
+                    }
+                });
+
                 document.querySelectorAll(".image-checkbox").forEach(cb => {
+                    if (cb.checked && !checkedImages.has(cb.dataset.id)) {
+                        checkedCount++;
+                    }
                     cb.checked = false;
                     const container = cb.closest(".image-container");
                     if (container) container.classList.remove("checked");
                 });
 
-                state.currentImages.forEach(img => {
-                    if (img) {
-                        img.checked = false;
-                    }
-                });
+                // Обновляем счетчики папок на клиенте (сняли чекбоксы = увеличили unchecked)
+                if (currentPath && checkedCount > 0) {
+                    folders.updateFolderCountAndParents(currentPath, checkedCount);
+                }
             }
         } catch (error) {
             utils.showError("Ошибка сброса чекбоксов", error);
@@ -343,7 +367,7 @@ const gallery = {
                 body: JSON.stringify({ path: currentPath, search: searchQuery })
             });
 
-            if (result.success) {
+            if (result.success) {             
                 toast.show(`Удалено изображений: ${result.count || 0}`, null, 3000);
                 gallery.load();
             }

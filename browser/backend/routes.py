@@ -105,7 +105,7 @@ def index(subpath: str = ""):
 
     return render_template(
         "index.html",
-        folder_tree=build_folder_tree(config.IMAGE_FOLDER)
+        folder_tree=build_folder_tree(config.IMAGE_FOLDER, "", metadata_store)
     )
 
 
@@ -368,3 +368,5 @@ def has_bookmark(metadata_id: str):
     
     has = BookmarksService.has(metadata_id)
     return jsonify({"has": has})
+
+

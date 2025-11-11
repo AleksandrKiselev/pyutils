@@ -83,7 +83,12 @@ const fullscreen = {
             wrapper?.classList.toggle("checked", checked);
 
             if (miniCheckbox) {
+                // Временно отключаем обработчик, чтобы избежать двойного обновления счетчика
+                const wasHandled = miniCheckbox.dataset.handling;
+                miniCheckbox.dataset.handling = "true";
                 miniCheckbox.checked = checked;
+                delete miniCheckbox.dataset.handling;
+                
                 const container = miniCheckbox.closest(".image-container");
                 if (container) {
                     container.classList.toggle("checked", checked);
@@ -91,9 +96,18 @@ const fullscreen = {
             }
 
             const metadataId = data?.id || "";
+            const imagePath = data?.image_path || "";
+            const folderPath = folders.getFolderPathFromImagePath(imagePath);
+            
             utils.apiRequest("/update_metadata", {
                 body: JSON.stringify({ id: metadataId, checked })
             }).catch(console.error);
+            
+            // Обновляем счетчик папки на клиенте
+            if (folderPath) {
+                const delta = checked ? -1 : 1; // Если чекнули, уменьшаем на 1, если сняли - увеличиваем на 1
+                folders.updateFolderCountAndParents(folderPath, delta);
+            }
         };
     },
 

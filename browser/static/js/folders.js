@@ -127,6 +127,50 @@ const folders = {
         const expanded = item.classList.toggle("expanded");
         children.classList.toggle("hidden", !expanded);
         folders.saveState();
+    },
+
+    updateFolderUncheckedCount(folderPath, delta) {
+        if (!folderPath) return;
+        
+        // Экранируем специальные символы в пути для селектора
+        const escapedPath = folderPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const folderLink = document.querySelector(`.folder-tree a[href="/${escapedPath}"]`);
+        if (folderLink) {
+            const currentUnchecked = parseInt(folderLink.dataset.folderUnchecked || "0", 10);
+            const total = parseInt(folderLink.dataset.folderTotal || "0", 10);
+            const newUnchecked = Math.max(0, Math.min(total, currentUnchecked + delta));
+            folderLink.dataset.folderUnchecked = newUnchecked.toString();
+            
+            // Извлекаем имя папки из текста ссылки (до скобки) или используем последнюю часть пути
+            const currentText = folderLink.textContent;
+            const match = currentText.match(/^(.+?)\s*\(/);
+            const folderName = match ? match[1].trim() : (folderPath.split("/").pop() || folderPath);
+            folderLink.textContent = `${folderName} (${newUnchecked}/${total})`;
+        }
+    },
+
+    updateFolderCountAndParents(folderPath, delta) {
+        if (!folderPath) return;
+        
+        // Обновляем текущую папку
+        folders.updateFolderUncheckedCount(folderPath, delta);
+        
+        // Обновляем все родительские папки
+        const pathParts = folderPath.split("/").filter(p => p);
+        for (let i = pathParts.length - 1; i > 0; i--) {
+            const parentPath = pathParts.slice(0, i).join("/");
+            folders.updateFolderUncheckedCount(parentPath, delta);
+        }
+    },
+
+    getFolderPathFromImagePath(imagePath) {
+        if (!imagePath) return "";
+        const pathParts = imagePath.split("/").filter(p => p);
+        if (pathParts.length > 1) {
+            pathParts.pop(); // Убираем имя файла
+            return pathParts.join("/");
+        }
+        return "";
     }
 };
 

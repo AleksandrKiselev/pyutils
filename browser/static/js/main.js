@@ -84,6 +84,10 @@ window.onload = function () {
 
     document.addEventListener("change", e => {
         if (e.target.classList.contains("image-checkbox")) {
+            // Пропускаем, если обработка уже идет (из fullscreen)
+            if (e.target.dataset.handling) {
+                return;
+            }
             gallery.saveCheckboxState(e);
             gallery.updateImageOpacity();
         }
