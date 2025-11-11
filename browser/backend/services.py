@@ -22,10 +22,10 @@ def _get_filtered_images(folder_path: Optional[str], search: str) -> List[Dict]:
 
 
 def _get_metadata_or_raise(metadata_id: str) -> Dict:
-    metadata = metadata_store.get_by_id(metadata_id)
-    if not metadata:
+    all_metadata = metadata_store.get_by_ids([metadata_id])
+    if metadata_id not in all_metadata:
         raise FileNotFoundError(f"Метаданные с ID {metadata_id} не найдены")
-    return metadata
+    return all_metadata[metadata_id]
 
 
 class ImageService:
@@ -54,6 +54,58 @@ class ImageService:
         if os.path.exists(thumb):
             os.remove(thumb)
         metadata_store.delete([metadata_id])
+
+    @staticmethod
+    def delete_checked_images(folder_path: Optional[str], search: str) -> int:
+        images = _get_filtered_images(folder_path, search)
+        metadata_ids = [
+            img.get("id") for img in images 
+            if img.get("id") and img.get("checked")
+        ]
+        if not metadata_ids:
+            return 0
+        
+        # Получаем все метаданные батчем
+        all_metadata = metadata_store.get_by_ids(metadata_ids)
+        if not all_metadata:
+            return 0
+        
+        # Удаляем файлы изображений и миниатюр, собираем ID для удаления метаданных
+        ids_to_delete_metadata = []
+        for metadata_id, metadata in all_metadata.items():
+            try:
+                image_path, thumb_path = get_absolute_paths(metadata)
+                file_deleted = False
+                
+                # Удаляем файл изображения (если существует)
+                if os.path.exists(image_path):
+                    try:
+                        os.remove(image_path)
+                        file_deleted = True
+                    except OSError as e:
+                        logger.warning(f"Ошибка удаления файла изображения {image_path}: {e}")
+                        continue  # Пропускаем, если не удалось удалить существующий файл
+                else:
+                    # Файл уже удален, но метаданные остались - удаляем их (cleanup)
+                    file_deleted = True
+                
+                # Удаляем миниатюру (если существует)
+                if os.path.exists(thumb_path):
+                    try:
+                        os.remove(thumb_path)
+                    except OSError as e:
+                        logger.warning(f"Ошибка удаления миниатюры {thumb_path}: {e}")
+                
+                if file_deleted:
+                    ids_to_delete_metadata.append(metadata_id)
+            except Exception as e:
+                logger.warning(f"Ошибка обработки изображения {metadata.get('image_path', 'unknown')}: {e}")
+        
+        # Удаляем метаданные батчем
+        if ids_to_delete_metadata:
+            metadata_store.delete(ids_to_delete_metadata)
+        
+        return len(ids_to_delete_metadata)
 
 
 class MetadataService:

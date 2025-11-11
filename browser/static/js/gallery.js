@@ -316,8 +316,8 @@ const gallery = {
         }
     },
 
-    async deleteMetadata() {
-        // Блокируем удаление метаданных во время генерации метаданных
+    async deleteCheckedImages() {
+        // Блокируем удаление во время генерации метаданных
         if (progressBar.taskId) {
             toast.show("Дождитесь завершения генерации метаданных", "Обработка изображений...");
             return;
@@ -326,21 +326,28 @@ const gallery = {
         const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
         const searchQuery = state.searchQuery || "";
 
-        if (!confirm("Удалить метаданные для всех изображений в текущей папке/фильтрах? Это действие нельзя отменить.")) {
+        // Проверяем, есть ли отмеченные изображения
+        const checkedCount = Array.from(document.querySelectorAll(".image-checkbox:checked")).length;
+        if (checkedCount === 0) {
+            toast.show("Нет отмеченных изображений", null, 3000);
+            return;
+        }
+
+        if (!confirm(`Удалить ${checkedCount} отмеченных изображений? Это действие нельзя отменить.`)) {
             return;
         }
 
         try {
-            const result = await utils.apiRequest("/delete_metadata", {
+            const result = await utils.apiRequest("/delete_checked_images", {
                 body: JSON.stringify({ path: currentPath, search: searchQuery })
             });
 
             if (result.success) {
-                toast.show(`Удалено метаданных: ${result.count || 0}`, null, 3000);
+                toast.show(`Удалено изображений: ${result.count || 0}`, null, 3000);
                 gallery.load();
             }
         } catch (error) {
-            utils.showError("Ошибка удаления метаданных", error);
+            utils.showError("Ошибка удаления изображений", error);
         }
     },
 

@@ -89,10 +89,11 @@ class MetadataStore:
         if not image_paths:
             return []
         rel_paths = [get_relative_path(path) for path in image_paths]
-        return self._db_manager.get_batch_by_paths(rel_paths)
+        return self._db_manager.get_by_paths(rel_paths)
 
-    def get_by_id(self, metadata_id: str) -> Optional[Dict[str, Any]]:
-        return self._db_manager.get_by_id(metadata_id)
+    def get_by_ids(self, metadata_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Получает метаданные для списка ID. Возвращает словарь {id: metadata}"""
+        return self._db_manager.get_by_ids(metadata_ids)
 
     def get_all(self) -> List[Dict[str, Any]]:
         return self._db_manager.get_all()
@@ -175,7 +176,7 @@ class MetadataStore:
             return 0
         
         logger.info(f"Начало batch обновления {len(updates)} метаданных")
-        current_metadata = self._db_manager.get_batch_by_ids(metadata_ids)
+        current_metadata = self.get_by_ids(metadata_ids)
         
         updated_metadata = []
         allowed_keys = {"checked", "rating", "tags"}

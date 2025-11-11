@@ -227,6 +227,15 @@ def delete_metadata():
     return jsonify({"success": True, "count": count})
 
 
+@routes.route("/delete_checked_images", methods=["POST"])
+@handle_route_errors
+def delete_checked_images():
+    data = _validate_json_request()
+    search_folder_path, search = _get_validated_path_and_search(data)
+    count = ImageService.delete_checked_images(search_folder_path, search)
+    return jsonify({"success": True, "count": count})
+
+
 @routes.route("/check_processing_needed", methods=["POST"])
 @handle_route_errors
 def check_processing_needed():
@@ -305,11 +314,10 @@ def add_bookmark():
     if not metadata_id or not isinstance(metadata_id, str):
         raise ValueError("ID метаданных обязательно и должно быть строкой")
     
-    metadata = MetadataService.get_by_id(metadata_id) if hasattr(MetadataService, "get_by_id") else None
-    if not metadata:
-        metadata = metadata_store.get_by_id(metadata_id)
-    if not metadata:
+    all_metadata = metadata_store.get_by_ids([metadata_id])
+    if metadata_id not in all_metadata:
         raise FileNotFoundError(f"Метаданные с ID {metadata_id} не найдены")
+    metadata = all_metadata[metadata_id]
     
     image_data = {
         "image_path": metadata.get("image_path", ""),

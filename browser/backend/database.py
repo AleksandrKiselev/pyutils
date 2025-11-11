@@ -255,18 +255,23 @@ class DatabaseManager:
             str(thumb_path)
         )
     
-    def get_by_id(self, metadata_id: str) -> Optional[Dict[str, Any]]:
-        """Получает метаданные по ID"""
-        if self._memory_conn is None:
-            return None
+    def get_by_ids(self, metadata_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Получает метаданные для списка ID. Возвращает словарь {id: metadata}"""
+        if not metadata_ids or self._memory_conn is None:
+            return {}
+        
+        result = {}
         try:
+            placeholders = ",".join("?" * len(metadata_ids))
             cursor = self._memory_conn.cursor()
-            cursor.execute("SELECT * FROM metadata WHERE id = ?", (metadata_id,))
-            row = cursor.fetchone()
-            return self._row_to_dict(row) if row else None
+            cursor.execute(f"SELECT * FROM metadata WHERE id IN ({placeholders})", metadata_ids)
+            rows = cursor.fetchall()
+            for row in rows:
+                metadata = self._row_to_dict(row)
+                result[metadata["id"]] = metadata
         except Exception as e:
-            logger.warning(f"Ошибка получения метаданных по ID {metadata_id}: {e}")
-            return None
+            logger.warning(f"Ошибка batch чтения метаданных по ID: {e}")
+        return result
     
     def get_by_image_path(self, image_path: str) -> Optional[Dict[str, Any]]:
         """Получает метаданные по пути изображения"""
@@ -307,7 +312,7 @@ class DatabaseManager:
             logger.error(f"Ошибка получения всех метаданных: {e}")
             return []
     
-    def get_batch_by_paths(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
+    def get_by_paths(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
         """Получает метаданные для списка путей изображений"""
         if not image_paths or self._memory_conn is None:
             return []
@@ -327,24 +332,6 @@ class DatabaseManager:
                     result[path_to_index[image_path]] = metadata
         except Exception as e:
             logger.warning(f"Ошибка batch чтения метаданных: {e}")
-        return result
-    
-    def get_batch_by_ids(self, metadata_ids: List[str]) -> Dict[str, Dict[str, Any]]:
-        """Получает метаданные для списка ID. Возвращает словарь {id: metadata}"""
-        if not metadata_ids or self._memory_conn is None:
-            return {}
-        
-        result = {}
-        try:
-            placeholders = ",".join("?" * len(metadata_ids))
-            cursor = self._memory_conn.cursor()
-            cursor.execute(f"SELECT * FROM metadata WHERE id IN ({placeholders})", metadata_ids)
-            rows = cursor.fetchall()
-            for row in rows:
-                metadata = self._row_to_dict(row)
-                result[metadata["id"]] = metadata
-        except Exception as e:
-            logger.warning(f"Ошибка batch чтения метаданных по ID: {e}")
         return result
     
     def save(self, metadata_list: List[Dict[str, Any]], force_save: bool = False) -> None:
