@@ -238,6 +238,10 @@ const gallery = {
         if (DOM.sortSelect) {
             state.sortBy = DOM.sortSelect.value;
         }
+        // Сохраняем состояние после изменения поиска
+        if (typeof stateManager !== "undefined" && stateManager.save) {
+            stateManager.save();
+        }
         await gallery.load();
     },
 

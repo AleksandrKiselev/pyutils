@@ -123,7 +123,26 @@ def filter_images(images, search):
     def normalize(tag):
         return tag.strip().lower()
 
-    if search.startswith(("tags:", "tag:", "t:")):
+    if search.startswith("u:"):
+        raw = search.split(":", 1)[1].strip().lower()
+        unchecked_images = [img for img in images if not img.get("checked", False)]
+        if not raw:
+            return unchecked_images
+        if raw.startswith("u:"):
+            return [img for img in unchecked_images if raw in img.get("prompt", "").lower()]
+        return filter_images(unchecked_images, raw)
+
+    # Фильтр отмеченных изображений
+    if search.startswith("c:"):
+        raw = search.split(":", 1)[1].strip().lower()
+        checked_images = [img for img in images if img.get("checked", False)]
+        if not raw:
+            return checked_images
+        if raw.startswith("c:"):
+            return [img for img in checked_images if raw in img.get("prompt", "").lower()]
+        return filter_images(checked_images, raw)
+
+    if search.startswith("t:"):
         raw = search.split(":", 1)[1].strip().lower()
         if not raw:
             return [img for img in images if not img.get("tags")]

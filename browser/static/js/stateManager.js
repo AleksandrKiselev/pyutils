@@ -3,7 +3,8 @@ const stateManager = {
         const savedState = {
             currentPath: window.location.pathname,
             sortBy: DOM.sortSelect ? DOM.sortSelect.value : (state.sortBy || "date-desc"),
-            sidebarVisible: document.body.classList.contains("sidebar-visible")
+            sidebarVisible: document.body.classList.contains("sidebar-visible"),
+            searchQuery: state.searchQuery || ""
         };
         localStorage.setItem("galleryState", JSON.stringify(savedState));
         if (typeof folders !== "undefined" && folders.saveState) {
@@ -28,6 +29,11 @@ const stateManager = {
             if (typeof saved.sidebarVisible === "boolean" && DOM.sidebar) {
                 DOM.sidebar.classList.toggle("hidden", !saved.sidebarVisible);
                 document.body.classList.toggle("sidebar-visible", saved.sidebarVisible);
+            }
+
+            if (saved.searchQuery && DOM.searchBox) {
+                state.searchQuery = saved.searchQuery;
+                DOM.searchBox.value = saved.searchQuery;
             }
         } catch (e) {
             console.warn("Не удалось восстановить состояние:", e);
