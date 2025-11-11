@@ -122,11 +122,14 @@ class ImageService:
                 unchecked_images = random.sample(unchecked_images, len(unchecked_images))
         else:
             unchecked_images = sort_images(unchecked_images, sort_by, order)
-        # Извлекаем промпты
-        unchecked_prompts = [
-            img.get("prompt", "") for img in unchecked_images 
-            if img.get("prompt")
-        ]
+        # Извлекаем промпты, фильтруем пустые и убираем дубликаты с сохранением порядка
+        unchecked_prompts = []
+        seen = set()
+        for img in unchecked_images:
+            prompt = img.get("prompt", "").strip()
+            if prompt and prompt not in seen:
+                unchecked_prompts.append(prompt)
+                seen.add(prompt)
         return unchecked_prompts
 
 
