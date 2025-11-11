@@ -16,8 +16,8 @@ from database import DatabaseManager
 logger = logging.getLogger(__name__)
 
 
-def _get_filtered_images(folder_path: Optional[str], search: str) -> List[Dict]:
-    images = collect_images(folder_path)
+def _get_filtered_images(folder_path: Optional[str], search: str, hide_checked: bool = False) -> List[Dict]:
+    images = collect_images(folder_path, hide_checked=hide_checked)
     return filter_images(images, search)
 
 
@@ -31,8 +31,8 @@ def _get_metadata_or_raise(metadata_id: str) -> Dict:
 class ImageService:
     @staticmethod
     def get_images(folder_path: Optional[str], search: str, sort_by: str,
-                   order: str, limit: int, offset: int) -> List[Dict]:
-        images = _get_filtered_images(folder_path, search)
+                   order: str, limit: int, offset: int, hide_checked: bool = False) -> List[Dict]:
+        images = _get_filtered_images(folder_path, search, hide_checked)
         
         if sort_by == "random":
             if not images:

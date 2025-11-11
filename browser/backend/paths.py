@@ -16,17 +16,6 @@ def _get_filename_hash(image_path: str) -> str:
     return hashlib.md5(filename.encode('utf-8')).hexdigest()
 
 
-def _count_images_in_dir(dir_path: str) -> int:
-    try:
-        return sum(
-            1 for entry in os.scandir(dir_path)
-            if entry.is_file() and os.path.splitext(entry.name)[1].lower() in config.ALLOWED_EXTENSIONS
-        )
-    except OSError as e:
-        logger.warning(f"Ошибка подсчета изображений в {dir_path}: {e}")
-        return 0
-
-
 def count_images_in_dir(dir_path: str, metadata_store) -> Tuple[int, int]:
     """Подсчитывает общее количество и количество неотмеченных изображений в директории.
     Возвращает (total_count, unchecked_count)"""

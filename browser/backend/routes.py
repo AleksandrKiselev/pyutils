@@ -137,6 +137,7 @@ def get_images(subpath: str = ""):
         raise ValueError(f"Неверный order: {order}")
 
     search_folder_path, search = _parse_search_scope(request.args.get("search", ""), folder_path)
+    hide_checked = request.args.get("hide_checked", "false").lower() == "true"
 
     images = ImageService.get_images(
         folder_path=search_folder_path,
@@ -144,7 +145,8 @@ def get_images(subpath: str = ""):
         sort_by=sort_by,
         order=order,
         limit=limit,
-        offset=offset
+        offset=offset,
+        hide_checked=hide_checked
     )
 
     return jsonify(images)

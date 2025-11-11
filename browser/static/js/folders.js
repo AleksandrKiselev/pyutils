@@ -14,6 +14,8 @@ const folders = {
                 folders.rebindEventHandlers();
                 folders.restoreState();
                 folders.updateActiveHighlight();
+                // Обновляем формат отображения в зависимости от фильтра
+                folders.updateDisplayFormat();
             } else {
                 console.error("Папки не найдены в ответе");
             }
@@ -141,11 +143,16 @@ const folders = {
             const newUnchecked = Math.max(0, Math.min(total, currentUnchecked + delta));
             folderLink.dataset.folderUnchecked = newUnchecked.toString();
             
-            // Извлекаем имя папки из текста ссылки (до скобки) или используем последнюю часть пути
-            const currentText = folderLink.textContent;
-            const match = currentText.match(/^(.+?)\s*\(/);
-            const folderName = match ? match[1].trim() : (folderPath.split("/").pop() || folderPath);
-            folderLink.textContent = `${folderName} (${newUnchecked}/${total})`;
+            // Используем data-folder-name, если доступно, иначе извлекаем из текста или пути
+            const folderName = folderLink.dataset.folderName || 
+                               (folderPath.split("/").pop() || folderPath);
+            
+            // Если включен фильтр, показываем только unchecked
+            if (state.hideChecked) {
+                folderLink.textContent = `${folderName} (${newUnchecked})`;
+            } else {
+                folderLink.textContent = `${folderName} (${newUnchecked}/${total})`;
+            }
         }
     },
 
@@ -171,6 +178,23 @@ const folders = {
             return pathParts.join("/");
         }
         return "";
+    },
+
+    updateDisplayFormat() {
+        // Обновляем формат отображения счетчиков в зависимости от фильтра
+        document.querySelectorAll(".folder-tree a[data-folder-total]").forEach(link => {
+            const total = parseInt(link.dataset.folderTotal || "0", 10);
+            const unchecked = parseInt(link.dataset.folderUnchecked || "0", 10);
+            // Используем data-folder-name, если доступно, иначе извлекаем из href
+            const folderName = link.dataset.folderName || 
+                               (link.getAttribute("href")?.replace(/^\/+/, "").split("/").pop() || "");
+            
+            if (state.hideChecked) {
+                link.textContent = `${folderName} (${unchecked})`;
+            } else {
+                link.textContent = `${folderName} (${unchecked}/${total})`;
+            }
+        });
     }
 };
 

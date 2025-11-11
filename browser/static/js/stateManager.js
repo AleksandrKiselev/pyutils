@@ -4,7 +4,8 @@ const stateManager = {
             currentPath: window.location.pathname,
             sortBy: DOM.sortSelect ? DOM.sortSelect.value : (state.sortBy || "date-desc"),
             sidebarVisible: document.body.classList.contains("sidebar-visible"),
-            searchQuery: state.searchQuery || ""
+            searchQuery: state.searchQuery || "",
+            hideChecked: state.hideChecked || false
         };
         localStorage.setItem("galleryState", JSON.stringify(savedState));
         if (typeof folders !== "undefined" && folders.saveState) {
@@ -34,6 +35,19 @@ const stateManager = {
             if (saved.searchQuery && DOM.searchBox) {
                 state.searchQuery = saved.searchQuery;
                 DOM.searchBox.value = saved.searchQuery;
+            }
+
+            if (typeof saved.hideChecked === "boolean" && DOM.hideChecked) {
+                state.hideChecked = saved.hideChecked;
+                DOM.hideChecked.checked = saved.hideChecked;
+            }
+            
+            // Обновляем формат отображения в дереве папок после восстановления состояния
+            if (typeof folders !== "undefined" && folders.updateDisplayFormat) {
+                // Небольшая задержка, чтобы дерево успело загрузиться
+                setTimeout(() => {
+                    folders.updateDisplayFormat();
+                }, 100);
             }
         } catch (e) {
             console.warn("Не удалось восстановить состояние:", e);

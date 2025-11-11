@@ -113,6 +113,25 @@ window.onload = function () {
     }
 };
 
+window.toggleHideChecked = function() {
+    if (!DOM.hideChecked) return;
+    
+    state.hideChecked = DOM.hideChecked.checked;
+    
+    // Сохраняем состояние
+    if (typeof stateManager !== "undefined" && stateManager.save) {
+        stateManager.save();
+    }
+    
+    // Обновляем формат отображения в дереве папок
+    if (typeof folders !== "undefined" && folders.updateDisplayFormat) {
+        folders.updateDisplayFormat();
+    }
+    
+    // Перезагружаем галерею с новым фильтром
+    gallery.load();
+};
+
 window.onpopstate = (event) => {
     // Блокируем переключение папок, если идет генерация метаданных
     if (progressBar.taskId) {

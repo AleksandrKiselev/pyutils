@@ -97,7 +97,8 @@ const gallery = {
             const isRandom = sort === "random";
             
             // Для случайной сортировки offset не важен, но передаем его для совместимости
-            const query = `/images${window.location.pathname}?limit=${limit}&offset=${state.offset}&search=${encodeURIComponent(state.searchQuery)}&sort_by=${sort}&order=${order}`;
+            const hideCheckedParam = state.hideChecked ? "&hide_checked=true" : "";
+            const query = `/images${window.location.pathname}?limit=${limit}&offset=${state.offset}&search=${encodeURIComponent(state.searchQuery)}&sort_by=${sort}&order=${order}${hideCheckedParam}`;
             const images = await (await fetch(query)).json();
 
             // Для обычной сортировки останавливаемся при пустом массиве (конец пагинации)
@@ -305,6 +306,19 @@ const gallery = {
             return;
         }
         
+        // Проверяем, есть ли отмеченные изображения
+        const hasChecked = Array.from(document.querySelectorAll(".image-checkbox:checked")).length > 0 ||
+            state.currentImages.some(img => img && img.checked);
+        
+        if (!hasChecked) {
+            toast.show("Нет отмеченных изображений", null, 3000);
+            return;
+        }
+        
+        if (!confirm("Снять выделение со всех отмеченных изображений?")) {
+            return;
+        }
+        
         const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
         const searchQuery = state.searchQuery || "";
 
@@ -356,13 +370,15 @@ const gallery = {
         const searchQuery = state.searchQuery || "";
 
         // Проверяем, есть ли отмеченные изображения
-        const checkedCount = Array.from(document.querySelectorAll(".image-checkbox:checked")).length;
-        if (checkedCount === 0) {
+        const hasChecked = Array.from(document.querySelectorAll(".image-checkbox:checked")).length > 0 ||
+            state.currentImages.some(img => img && img.checked);
+        
+        if (!hasChecked) {
             toast.show("Нет отмеченных изображений", null, 3000);
             return;
         }
 
-        if (!confirm(`Удалить ${checkedCount} отмеченных изображений? Это действие нельзя отменить.`)) {
+        if (!confirm("Удалить все отмеченные изображения? Это действие нельзя отменить.")) {
             return;
         }
 

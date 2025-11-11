@@ -37,6 +37,10 @@
                         </select>
                     </div>
                     <div class="reset-and-folder">
+                        <label class="hide-checked-label" title="Скрыть отмеченные изображения">
+                            <input type="checkbox" id="hide-checked" onchange="toggleHideChecked()">
+                            <span>Скрыть отмеченные</span>
+                        </label>
                         <button onclick="uncheckAllCheckboxes()" class="reset-checkboxes-btn icon-reset" title="Снять выделение"></button>
                         <button onclick="deleteCheckedImages()" class="delete-metadata-btn icon-delete" title="Удалить отмеченные изображения"></button>
                         <button onclick="downloadUncheckedPrompts()" class="download-prompts-btn icon-download" title="Скачать промпты неотмеченных изображений"></button>
@@ -63,7 +67,7 @@
                                 {% else %}
                                     <span class="folder-toggle-placeholder"></span>
                                 {% endif %}
-                                <a href="/{{ path }}" onclick="updateUrl(event, '{{ path }}')" data-folder-total="{{ node.total }}" data-folder-unchecked="{{ node.unchecked }}">
+                                <a href="/{{ path }}" onclick="updateUrl(event, '{{ path }}')" data-folder-name="{{ node.name }}" data-folder-total="{{ node.total }}" data-folder-unchecked="{{ node.unchecked }}">
                                     {{ node.name }} ({{ node.unchecked }}/{{ node.total }})
                                 </a>
                             </div>

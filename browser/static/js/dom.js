@@ -21,6 +21,7 @@ const DOM = {
     progressMessage: document.getElementById("progress-message"),
     progressText: document.getElementById("progress-text"),
     progressPercentage: document.getElementById("progress-percentage"),
-    bookmarksContainer: document.getElementById("bookmarks-container")
+    bookmarksContainer: document.getElementById("bookmarks-container"),
+    hideChecked: document.getElementById("hide-checked")
 };
 

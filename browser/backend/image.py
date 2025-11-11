@@ -34,7 +34,7 @@ def needs_processing(folder=None):
     return any(not metadata_store.has_metadata(path) for path in image_paths)
 
 
-def collect_images(folder=None, progress_callback=None):
+def collect_images(folder=None, progress_callback=None, hide_checked=False):
     image_paths = get_image_paths(folder)
     if len(image_paths) == 0:
         return []
@@ -47,6 +47,9 @@ def collect_images(folder=None, progress_callback=None):
         new_images = []
         for idx, (path, metadata) in enumerate(zip(image_paths, existing_metadata)):
             if metadata is not None:
+                # Если включен фильтр, пропускаем отмеченные изображения
+                if hide_checked and metadata.get("checked", False):
+                    continue
                 results.append((idx, metadata))
             else:
                 new_images.append((idx, path))
@@ -67,6 +70,7 @@ def collect_images(folder=None, progress_callback=None):
                 for future in as_completed(futures):
                     original_idx, path = futures[future]
                     metadata = future.result()
+                    # Новые изображения всегда неотмеченные, поэтому проверка hide_checked не нужна
                     results.append((original_idx, metadata))
                     new_metadata_list.append(metadata)
                     processed_new += 1
