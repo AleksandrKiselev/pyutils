@@ -56,9 +56,17 @@ class MetadataStore:
                     break
 
             metadata = "".join(chunks).strip()
-            pattern = r'"title"\s*:\s*"PromptTextForBrowser",.*?"widgets_values"\s*:\s*\[\s*\[\s*"([^"]+)"\s*\]\s*\]'
+            
+            # Используем улучшенное регулярное выражение с обработкой экранированных символов
+            pattern = r'"title"\s*:\s*"PromptTextForBrowser",.*?"widgets_values"\s*:\s*\[\s*\[\s*"((?:[^"\\]|\\.)*)"\s*\]\s*\]'
             match = re.search(pattern, metadata, re.DOTALL)
-            return match.group(1).strip() if match else ""
+            if match:
+                prompt = match.group(1)
+                # Декодируем экранированные символы JSON
+                prompt = prompt.replace('\\"', '"').replace('\\\\', '\\').replace('\\n', '\n').replace('\\r', '\r').replace('\\t', '\t')
+                return prompt.strip()
+            
+            return ""
         except IOError as e:
             logger.error(f"Ошибка чтения файла {image_path}: {e}")
             return ""
