@@ -66,6 +66,12 @@ class DatabaseManager:
             cursor.execute("CREATE INDEX idx_image_path ON metadata(image_path)")
             cursor.execute("CREATE INDEX idx_checked ON metadata(checked)")
             cursor.execute("CREATE INDEX idx_rating ON metadata(rating)")
+            cursor.execute("CREATE INDEX idx_prompt ON metadata(prompt)")
+            cursor.execute("CREATE INDEX idx_hash ON metadata(hash)")
+            cursor.execute("CREATE INDEX idx_size ON metadata(size)")
+            cursor.execute("CREATE INDEX idx_created_at ON metadata(created_at)")
+            cursor.execute("CREATE INDEX idx_updated_at ON metadata(updated_at)")
+            cursor.execute("CREATE INDEX idx_checked_rating ON metadata(checked, rating)")
             
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS bookmarks (
@@ -82,6 +88,9 @@ class DatabaseManager:
             """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookmarks_metadata_id ON bookmarks(metadata_id)")
             self._memory_conn.commit()
+            
+            # Создаем все индексы (на случай если какие-то отсутствуют)
+            self._create_missing_indexes()
     
     def _get_db_path(self) -> str:
         db_dir = os.path.join(config.IMAGE_FOLDER, config.METADATA_FOLDER)
@@ -166,10 +175,43 @@ class DatabaseManager:
             row_count = row[0] if row else 0
             if row_count > 0:
                 logger.info(f"Загружено {row_count} записей с диска")
+            
+            # Создаем недостающие индексы для существующей БД
+            self._create_missing_indexes()
+            
             return True
         except Exception as e:
             logger.warning(f"Ошибка загрузки данных с диска: {e}")
             return False
+    
+    def _create_missing_indexes(self) -> None:
+        """Создает недостающие индексы для существующей БД"""
+        if self._memory_conn is None:
+            return
+        
+        indexes = [
+            ("idx_image_path", "CREATE INDEX IF NOT EXISTS idx_image_path ON metadata(image_path)"),
+            ("idx_checked", "CREATE INDEX IF NOT EXISTS idx_checked ON metadata(checked)"),
+            ("idx_rating", "CREATE INDEX IF NOT EXISTS idx_rating ON metadata(rating)"),
+            ("idx_prompt", "CREATE INDEX IF NOT EXISTS idx_prompt ON metadata(prompt)"),
+            ("idx_hash", "CREATE INDEX IF NOT EXISTS idx_hash ON metadata(hash)"),
+            ("idx_size", "CREATE INDEX IF NOT EXISTS idx_size ON metadata(size)"),
+            ("idx_created_at", "CREATE INDEX IF NOT EXISTS idx_created_at ON metadata(created_at)"),
+            ("idx_updated_at", "CREATE INDEX IF NOT EXISTS idx_updated_at ON metadata(updated_at)"),
+            ("idx_checked_rating", "CREATE INDEX IF NOT EXISTS idx_checked_rating ON metadata(checked, rating)")
+        ]
+        
+        try:
+            cursor = self._memory_conn.cursor()
+            for index_name, create_sql in indexes:
+                try:
+                    cursor.execute(create_sql)
+                except Exception as e:
+                    logger.warning(f"Ошибка создания индекса {index_name}: {e}")
+            self._memory_conn.commit()
+            logger.info("Проверка и создание индексов завершена")
+        except Exception as e:
+            logger.error(f"Ошибка при создании индексов: {e}")
     
     def _save_to_disk(self) -> None:
         if self._memory_conn is None:
