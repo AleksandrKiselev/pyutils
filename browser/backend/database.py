@@ -84,8 +84,8 @@ class DatabaseManager:
             self._memory_conn.commit()
     
     def _get_db_path(self) -> str:
-        db_dir = os.path.join(config.IMAGE_FOLDER, ".metadata")
-        return os.path.join(db_dir, "metadata.db")
+        db_dir = os.path.join(config.IMAGE_FOLDER, config.METADATA_FOLDER)
+        return os.path.join(db_dir, config.DATABASE_NAME)
     
     def _load_from_disk(self) -> bool:
         """Загружает БД с диска. Возвращает True если загрузка успешна, False иначе"""

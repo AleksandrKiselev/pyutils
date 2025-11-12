@@ -65,7 +65,7 @@ class ThumbnailService:
                 
                 Path(thumb_path).parent.mkdir(parents=True, exist_ok=True)
                 with suppress_stderr():
-                    cv2.imwrite(thumb_path, thumbnail, [cv2.IMWRITE_WEBP_QUALITY, 85])
+                    cv2.imwrite(thumb_path, thumbnail, [cv2.IMWRITE_WEBP_QUALITY, config.THUMBNAIL_QUALITY])
                 return True
             except Exception as e:
                 if attempt < 4:

@@ -1,63 +1,43 @@
 import json
 import os
 import logging
-from typing import Dict, Any, Optional
+from types import SimpleNamespace
 
 logger = logging.getLogger(__name__)
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
-DEFAULT_CONFIG: Dict[str, Any] = {
+DEFAULT_CONFIG = {
     "image_folder": "static/images",
     "favorites_folder": "static/images/favorites",
     "thumbnail_size": 512,
     "items_per_page": 20,
-    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp", ".webm"]
+    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp", ".webm"],
+    "metadata_folder": ".metadata",
+    "database_name": "metadata.db",
+    "favorite_tag": "favorite",
+    "thumbnail_extension": ".webp",
+    "thumbnail_quality": 85
 }
 
-_config: Optional["Config"] = None
+_config = DEFAULT_CONFIG.copy()
 
+if os.path.exists(CONFIG_FILE):
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            _config.update(json.load(f))
+    except Exception as e:
+        logger.warning(f"Не удалось загрузить config.json: {e}")
 
-class Config(dict):
-    def __getattr__(self, name: str) -> Any:
-        try:
-            return self[name]
-        except KeyError:
-            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        self[name] = value
-
-
-def load_config() -> Config:
-    config = Config(DEFAULT_CONFIG.copy())
-
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                config.update(json.load(f))
-        except Exception as e:
-            logger.warning(f"Не удалось загрузить config.json: {e}")
-
-    config["image_folder"] = os.getenv("IMAGE_FOLDER", config["image_folder"])
-    config["favorites_folder"] = os.getenv("FAVORITES_FOLDER", config["favorites_folder"])
-    config["thumbnail_size"] = int(os.getenv("THUMBNAIL_SIZE", config["thumbnail_size"]))
-    config["items_per_page"] = int(os.getenv("ITEMS_PER_PAGE", config["items_per_page"]))
-
-    config.IMAGE_FOLDER = os.path.abspath(config["image_folder"])
-    config.FAVORITES_FOLDER = os.path.abspath(config["favorites_folder"])
-    config.ALLOWED_EXTENSIONS = set(config["allowed_extensions"])
-    config.THUMBNAIL_SIZE = int(config["thumbnail_size"])
-    config.ITEMS_PER_PAGE = int(config["items_per_page"])
-    config.AUTO_TAGS = set(config.get("auto_tags", []))
-
-    return config
-
-
-def get_config() -> Config:
-    global _config
-    if _config is None:
-        _config = load_config()
-    return _config
-
-
-config = get_config()
+config = SimpleNamespace(
+    IMAGE_FOLDER=os.path.abspath(_config["image_folder"]),
+    FAVORITES_FOLDER=os.path.abspath(_config["favorites_folder"]),
+    ALLOWED_EXTENSIONS=set(_config["allowed_extensions"]),
+    THUMBNAIL_SIZE=int(_config["thumbnail_size"]),
+    ITEMS_PER_PAGE=int(_config["items_per_page"]),
+    AUTO_TAGS=set(_config.get("auto_tags", [])),
+    METADATA_FOLDER=_config["metadata_folder"],
+    DATABASE_NAME=_config["database_name"],
+    FAVORITE_TAG=_config["favorite_tag"],
+    THUMBNAIL_EXTENSION=_config["thumbnail_extension"],
+    THUMBNAIL_QUALITY=int(_config["thumbnail_quality"])
+)

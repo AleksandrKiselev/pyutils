@@ -6,7 +6,6 @@ import logging
 
 from flask import Flask, jsonify
 
-from config import load_config
 from routes import routes
 from metadata import metadata_store
 
@@ -49,7 +48,6 @@ def create_app() -> Flask:
         template_folder=os.path.join(BASE_DIR, "templates")
     )
     app.register_blueprint(routes)
-    app.config.update(load_config())
 
     @app.errorhandler(404)
     def handle_not_found(error):

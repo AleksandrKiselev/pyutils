@@ -193,7 +193,7 @@ class FavoritesService:
         new_metadata["id"] = str(uuid.uuid4())
 
         tags = set(new_metadata.get("tags", []))
-        tags.add("favorite")
+        tags.add(config.FAVORITE_TAG)
         new_metadata["tags"] = sorted(tags)
 
         metadata_store.save([new_metadata])

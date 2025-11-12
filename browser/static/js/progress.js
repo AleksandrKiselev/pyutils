@@ -51,7 +51,9 @@ const progressBar = {
             this.show();
         }
 
-        if (DOM.progressMessage) DOM.progressMessage.textContent = message || "";
+        if (DOM.progressMessage) {
+            DOM.progressMessage.textContent = message || "";
+        }
         if (DOM.progressText) DOM.progressText.textContent = `${processed} / ${total}`;
         if (DOM.progressPercentage) DOM.progressPercentage.textContent = `${Math.round(percentage)}%`;
         if (DOM.progressBar) DOM.progressBar.style.width = `${percentage}%`;
@@ -61,6 +63,13 @@ const progressBar = {
                 if (DOM.progressBar) DOM.progressBar.style.width = "100%";
                 if (DOM.progressPercentage) DOM.progressPercentage.textContent = "100%";
                 if (DOM.progressText) DOM.progressText.textContent = `${total} / ${total}`;
+            }
+            
+            // Обновляем сообщение при завершении (убеждаемся, что оно отображается)
+            if (status === "completed") {
+                if (DOM.progressMessage) {
+                    DOM.progressMessage.textContent = message || "Завершено";
+                }
             }
             
             this.disconnect();

@@ -32,11 +32,11 @@ def count_images_in_dir(dir_path: str) -> int:
 def get_thumbnail_path(image_path: str) -> str:
     rel_path = get_relative_path(image_path)
     rel_dir = PathLib(rel_path).parent
-    meta_dir = PathLib(config.IMAGE_FOLDER) / ".metadata" / rel_dir
+    meta_dir = PathLib(config.IMAGE_FOLDER) / config.METADATA_FOLDER / rel_dir
     meta_dir.mkdir(parents=True, exist_ok=True)
 
     filename_hash = _get_filename_hash(image_path)
-    return str(meta_dir / f"{filename_hash}.webp")
+    return str(meta_dir / f"{filename_hash}{config.THUMBNAIL_EXTENSION}")
 
 
 def get_absolute_path(relative_path: str, root_folder: Optional[str] = None) -> str:
@@ -99,7 +99,7 @@ def walk_images(root_folder: Optional[str] = None) -> Iterator[str]:
 
     try:
         for root, dirs, files in os.walk(root_folder):
-            dirs[:] = [d for d in dirs if not d.startswith(".metadata")]
+            dirs[:] = [d for d in dirs if not d.startswith(config.METADATA_FOLDER)]
             for file in files:
                 if os.path.splitext(file)[1].lower() in config.ALLOWED_EXTENSIONS:
                     yield os.path.join(root, file)
