@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, List
 
 from paths import get_relative_path, get_thumbnail_path
 from config import config
-from tag import get_tags_for_image
+from tag import get_tags
 from database import DatabaseManager
 
 logger = logging.getLogger(__name__)
@@ -148,7 +148,7 @@ class MetadataStore:
             logger.warning(f"Ошибка получения пути миниатюры для {image_path}: {e}")
         
         try:
-            tags = get_tags_for_image(image_path)
+            tags = get_tags(image_path, enabled=config.AUTO_TAG_ENABLED)
         except Exception as e:
             logger.warning(f"Ошибка генерации тегов для {image_path}: {e}")
         

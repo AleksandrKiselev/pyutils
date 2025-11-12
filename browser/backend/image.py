@@ -4,7 +4,9 @@ import logging
 import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Optional
+from typing import Dict, Optional, Callable
+
+from tqdm import tqdm
 
 from metadata import metadata_store
 from paths import get_absolute_path, get_image_paths
@@ -33,7 +35,7 @@ def needs_processing(folder=None):
     return any(not metadata_store.has_metadata(path) for path in image_paths)
 
 
-def collect_images(folder=None, progress_callback=None):
+def collect_images(folder=None, progress_callback: Optional[Callable[[int, int, str], None]] = None):
     image_paths = get_image_paths(folder)
     if len(image_paths) == 0:
         return []
@@ -63,18 +65,28 @@ def collect_images(folder=None, progress_callback=None):
                 }
                 
                 logger.info(f"Начало создания метаданных для {total} новых изображений")
-                for future in as_completed(futures):
-                    original_idx, path = futures[future]
-                    metadata = future.result()
-                    results.append((original_idx, metadata))
-                    new_metadata_list.append(metadata)
-                    processed_new += 1
-                    if progress_callback and total >= 10:
-                        progress_callback(processed_new, total, f"Создание метаданных {processed_new}/{total}")
+                
+                # Прогресс-бар для консоли
+                with tqdm(total=total, desc="Создание метаданных", unit="изображений", ncols=100) as pbar:
+                    for future in as_completed(futures):
+                        original_idx, path = futures[future]
+                        metadata = future.result()
+                        results.append((original_idx, metadata))
+                        new_metadata_list.append(metadata)
+                        processed_new += 1
+                        
+                        # Обновление прогресс-бара в консоли
+                        pbar.update(1)
+                        pbar.set_postfix({"обработано": processed_new, "всего": total})
+                        
+                        # Обновление прогресс-бара для веб-интерфейса
+                        if progress_callback and total >= 10:
+                            progress_callback(processed_new, total, f"Создание метаданных {processed_new}/{total}")
                 
                 logger.info(f"Завершено создание метаданных для {len(new_metadata_list)} изображений")
             
             if new_metadata_list:
+                logger.info("Сохранение метаданных в БД...")
                 metadata_store.save(new_metadata_list)
                 logger.info(f"Сохранено {len(new_metadata_list)} метаданных в БД")
     
