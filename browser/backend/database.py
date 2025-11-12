@@ -312,6 +312,35 @@ class DatabaseManager:
             logger.error(f"Ошибка получения всех метаданных: {e}")
             return []
     
+    def get_by_folder(self, relative_folder: Optional[str]) -> List[Dict[str, Any]]:
+        """Получает метаданные для изображений в указанной директории (без рекурсии)"""
+        if self._memory_conn is None:
+            return []
+        
+        try:
+            cursor = self._memory_conn.cursor()
+            if relative_folder is None:
+                cursor.execute("SELECT * FROM metadata")
+            elif relative_folder == "":
+                cursor.execute("SELECT * FROM metadata WHERE instr(image_path, '/') = 0")
+            else:
+                normalized = relative_folder.replace("\\", "/").rstrip("/")
+                pattern = f"{normalized}/%"
+                start_index = len(normalized) + 2  # смещение после "<folder>/"
+                cursor.execute(
+                    """
+                    SELECT * FROM metadata
+                    WHERE image_path LIKE ?
+                      AND instr(substr(image_path, ?), '/') = 0
+                    """,
+                    (pattern, start_index)
+                )
+            rows = cursor.fetchall()
+            return [self._row_to_dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Ошибка получения метаданных для папки '{relative_folder}': {e}")
+            return []
+    
     def get_by_paths(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
         """Получает метаданные для списка путей изображений"""
         if not image_paths or self._memory_conn is None:

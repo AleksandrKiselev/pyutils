@@ -8,7 +8,7 @@ from typing import List, Dict, Optional
 
 from paths import get_absolute_path, get_relative_path, get_absolute_paths, get_thumbnail_path
 from metadata import metadata_store
-from image import collect_images, filter_images, sort_images
+from image import filter_images, sort_images
 from thumbnail import ThumbnailService
 from config import config
 from database import DatabaseManager
@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 def _get_filtered_images(folder_path: Optional[str], search: str, hide_checked: bool = False) -> List[Dict]:
-    images = collect_images(folder_path, hide_checked=hide_checked)
+    images = metadata_store.get_by_folder(folder_path)
+    if hide_checked:
+        images = [img for img in images if not img.get("checked", False)]
     return filter_images(images, search)
 
 

@@ -103,6 +103,20 @@ class MetadataStore:
         rel_image_path = get_relative_path(image_path)
         return self._db_manager.has_metadata(rel_image_path)
     
+    def get_by_folder(self, folder_path: Optional[str]) -> List[Dict[str, Any]]:
+        """Получает метаданные для изображений внутри указанной директории (без рекурсии)."""
+        if folder_path is None:
+            return self._db_manager.get_by_folder(None)
+        
+        relative = get_relative_path(folder_path).replace("\\", "/")
+        normalized = relative.strip("/")
+        
+        # Если путь совпадает с корневой директорией, возвращаем файлы в корне
+        if not normalized:
+            return self._db_manager.get_by_folder("")
+        
+        return self._db_manager.get_by_folder(normalized)
+    
     def create_metadata(self, image_path: str) -> Dict[str, Any]:
         prompt = ""
         size = 0
