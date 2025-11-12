@@ -6,8 +6,6 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Optional, Callable
 
-from tqdm import tqdm
-
 from metadata import metadata_store
 from paths import get_absolute_path, get_image_paths
 from config import config
@@ -66,22 +64,16 @@ def collect_images(folder=None, progress_callback: Optional[Callable[[int, int, 
                 
                 logger.info(f"Начало создания метаданных для {total} новых изображений")
                 
-                # Прогресс-бар для консоли
-                with tqdm(total=total, desc="Создание метаданных", unit="изображений", ncols=100) as pbar:
-                    for future in as_completed(futures):
-                        original_idx, path = futures[future]
-                        metadata = future.result()
-                        results.append((original_idx, metadata))
-                        new_metadata_list.append(metadata)
-                        processed_new += 1
-                        
-                        # Обновление прогресс-бара в консоли
-                        pbar.update(1)
-                        pbar.set_postfix({"обработано": processed_new, "всего": total})
-                        
-                        # Обновление прогресс-бара для веб-интерфейса
-                        if progress_callback and total >= 10:
-                            progress_callback(processed_new, total, f"Создание метаданных {processed_new}/{total}")
+                for future in as_completed(futures):
+                    original_idx, path = futures[future]
+                    metadata = future.result()
+                    results.append((original_idx, metadata))
+                    new_metadata_list.append(metadata)
+                    processed_new += 1
+                    
+                    # Обновление прогресс-бара для веб-интерфейса
+                    if progress_callback and total >= 10:
+                        progress_callback(processed_new, total, f"Создание метаданных {processed_new}/{total}")
                 
                 logger.info(f"Завершено создание метаданных для {len(new_metadata_list)} изображений")
             
