@@ -25,10 +25,6 @@ class MetadataStore:
     def initialize(self) -> None:
         self._db_manager.init_database()
         atexit.register(self._db_manager.force_save)
-    
-    def _load_from_db(self, image_path: str) -> Optional[Dict[str, Any]]:
-        rel_image_path = get_relative_path(image_path)
-        return self._db_manager.get_by_image_path(rel_image_path)
 
     def _extract_prompt_from_image(self, image_path: str) -> str:
         try:

@@ -102,12 +102,6 @@ const fullscreen = {
             utils.apiRequest("/update_metadata", {
                 body: JSON.stringify({ id: metadataId, checked })
             }).catch(console.error);
-            
-            // Обновляем счетчик папки на клиенте
-            if (folderPath) {
-                const delta = checked ? -1 : 1; // Если чекнули, уменьшаем на 1, если сняли - увеличиваем на 1
-                folders.updateFolderCountAndParents(folderPath, delta);
-            }
         };
     },
 

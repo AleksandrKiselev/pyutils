@@ -41,14 +41,6 @@ const stateManager = {
                 state.hideChecked = saved.hideChecked;
                 DOM.hideChecked.checked = saved.hideChecked;
             }
-            
-            // Обновляем формат отображения в дереве папок после восстановления состояния
-            if (typeof folders !== "undefined" && folders.updateDisplayFormat) {
-                // Небольшая задержка, чтобы дерево успело загрузиться
-                setTimeout(() => {
-                    folders.updateDisplayFormat();
-                }, 100);
-            }
         } catch (e) {
             console.warn("Не удалось восстановить состояние:", e);
         }

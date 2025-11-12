@@ -14,8 +14,6 @@ const folders = {
                 folders.rebindEventHandlers();
                 folders.restoreState();
                 folders.updateActiveHighlight();
-                // Обновляем формат отображения в зависимости от фильтра
-                folders.updateDisplayFormat();
             } else {
                 console.error("Папки не найдены в ответе");
             }
@@ -131,45 +129,6 @@ const folders = {
         folders.saveState();
     },
 
-    updateFolderUncheckedCount(folderPath, delta) {
-        if (!folderPath) return;
-        
-        // Экранируем специальные символы в пути для селектора
-        const escapedPath = folderPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const folderLink = document.querySelector(`.folder-tree a[href="/${escapedPath}"]`);
-        if (folderLink) {
-            const currentUnchecked = parseInt(folderLink.dataset.folderUnchecked || "0", 10);
-            const total = parseInt(folderLink.dataset.folderTotal || "0", 10);
-            const newUnchecked = Math.max(0, Math.min(total, currentUnchecked + delta));
-            folderLink.dataset.folderUnchecked = newUnchecked.toString();
-            
-            // Используем data-folder-name, если доступно, иначе извлекаем из текста или пути
-            const folderName = folderLink.dataset.folderName || 
-                               (folderPath.split("/").pop() || folderPath);
-            
-            // Если включен фильтр, показываем только unchecked
-            if (state.hideChecked) {
-                folderLink.textContent = `${folderName} (${newUnchecked})`;
-            } else {
-                folderLink.textContent = `${folderName} (${newUnchecked}/${total})`;
-            }
-        }
-    },
-
-    updateFolderCountAndParents(folderPath, delta) {
-        if (!folderPath) return;
-        
-        // Обновляем текущую папку
-        folders.updateFolderUncheckedCount(folderPath, delta);
-        
-        // Обновляем все родительские папки
-        const pathParts = folderPath.split("/").filter(p => p);
-        for (let i = pathParts.length - 1; i > 0; i--) {
-            const parentPath = pathParts.slice(0, i).join("/");
-            folders.updateFolderUncheckedCount(parentPath, delta);
-        }
-    },
-
     getFolderPathFromImagePath(imagePath) {
         if (!imagePath) return "";
         const pathParts = imagePath.split("/").filter(p => p);
@@ -178,23 +137,6 @@ const folders = {
             return pathParts.join("/");
         }
         return "";
-    },
-
-    updateDisplayFormat() {
-        // Обновляем формат отображения счетчиков в зависимости от фильтра
-        document.querySelectorAll(".folder-tree a[data-folder-total]").forEach(link => {
-            const total = parseInt(link.dataset.folderTotal || "0", 10);
-            const unchecked = parseInt(link.dataset.folderUnchecked || "0", 10);
-            // Используем data-folder-name, если доступно, иначе извлекаем из href
-            const folderName = link.dataset.folderName || 
-                               (link.getAttribute("href")?.replace(/^\/+/, "").split("/").pop() || "");
-            
-            if (state.hideChecked) {
-                link.textContent = `${folderName} (${unchecked})`;
-            } else {
-                link.textContent = `${folderName} (${unchecked}/${total})`;
-            }
-        });
     }
 };
 

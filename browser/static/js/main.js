@@ -123,11 +123,6 @@ window.toggleHideChecked = function() {
         stateManager.save();
     }
     
-    // Обновляем формат отображения в дереве папок
-    if (typeof folders !== "undefined" && folders.updateDisplayFormat) {
-        folders.updateDisplayFormat();
-    }
-    
     // Перезагружаем галерею с новым фильтром
     gallery.load();
 };

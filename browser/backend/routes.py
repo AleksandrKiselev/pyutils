@@ -105,7 +105,7 @@ def index(subpath: str = ""):
 
     return render_template(
         "index.html",
-        folder_tree=build_folder_tree(config.IMAGE_FOLDER, "", metadata_store)
+        folder_tree=build_folder_tree(config.IMAGE_FOLDER)
     )
 
 

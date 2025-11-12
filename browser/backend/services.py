@@ -11,7 +11,6 @@ from metadata import metadata_store
 from image import filter_images, sort_images
 from thumbnail import ThumbnailService
 from config import config
-from database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 

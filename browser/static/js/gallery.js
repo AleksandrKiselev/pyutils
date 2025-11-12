@@ -274,12 +274,6 @@ const gallery = {
         utils.apiRequest("/update_metadata", {
             body: JSON.stringify({ id: cb.dataset.id, checked: cb.checked })
         }).catch(console.error);
-        
-        // Обновляем счетчик папки на клиенте
-        if (folderPath) {
-            const delta = cb.checked ? -1 : 1; // Если чекнули, уменьшаем на 1, если сняли - увеличиваем на 1
-            folders.updateFolderCountAndParents(folderPath, delta);
-        }
     },
 
     loadCheckboxState() {
@@ -348,11 +342,6 @@ const gallery = {
                     const container = cb.closest(".image-container");
                     if (container) container.classList.remove("checked");
                 });
-
-                // Обновляем счетчики папок на клиенте (сняли чекбоксы = увеличили unchecked)
-                if (currentPath && checkedCount > 0) {
-                    folders.updateFolderCountAndParents(currentPath, checkedCount);
-                }
             }
         } catch (error) {
             utils.showError("Ошибка сброса чекбоксов", error);

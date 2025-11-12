@@ -67,8 +67,8 @@
                                 {% else %}
                                     <span class="folder-toggle-placeholder"></span>
                                 {% endif %}
-                                <a href="/{{ path }}" onclick="updateUrl(event, '{{ path }}')" data-folder-name="{{ node.name }}" data-folder-total="{{ node.total }}" data-folder-unchecked="{{ node.unchecked }}">
-                                    {{ node.name }} ({{ node.unchecked }}/{{ node.total }})
+                                <a href="/{{ path }}" onclick="updateUrl(event, '{{ path }}')" data-folder-name="{{ node.name }}" data-folder-total="{{ node.total }}">
+                                    {{ node.name }} ({{ node.total }})
                                 </a>
                             </div>
                             {% if node.children %}

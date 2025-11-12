@@ -3,7 +3,7 @@ import hashlib
 import logging
 from functools import lru_cache
 from pathlib import Path as PathLib
-from typing import Dict, Any, Iterator, Optional, Tuple, List
+from typing import Dict, Any, Iterator, Optional, List, Tuple
 
 from config import config
 
@@ -16,35 +16,17 @@ def _get_filename_hash(image_path: str) -> str:
     return hashlib.md5(filename.encode('utf-8')).hexdigest()
 
 
-def count_images_in_dir(dir_path: str, metadata_store) -> Tuple[int, int]:
-    """Подсчитывает общее количество и количество неотмеченных изображений в директории.
-    Возвращает (total_count, unchecked_count)"""
+def count_images_in_dir(dir_path: str) -> int:
+    """Подсчитывает количество изображений в директории."""
     try:
-        image_paths = [
-            entry.path for entry in os.scandir(dir_path)
+        count = sum(
+            1 for entry in os.scandir(dir_path)
             if entry.is_file() and os.path.splitext(entry.name)[1].lower() in config.ALLOWED_EXTENSIONS
-        ]
-        if not image_paths:
-            return (0, 0)
-        
-        total_count = len(image_paths)
-        
-        # Получаем метаданные для всех изображений в папке
-        metadata_list = metadata_store.get_by_paths(image_paths)
-        
-        # Считаем неотмеченные (checked=False или отсутствуют метаданные)
-        unchecked_count = 0
-        for metadata in metadata_list:
-            if metadata is None:
-                # Если метаданных нет, считаем как неотмеченное
-                unchecked_count += 1
-            elif not metadata.get("checked", False):
-                unchecked_count += 1
-        
-        return (total_count, unchecked_count)
+        )
+        return count
     except OSError as e:
         logger.warning(f"Ошибка подсчета изображений в {dir_path}: {e}")
-        return (0, 0)
+        return 0
 
 
 def get_thumbnail_path(image_path: str) -> str:
@@ -126,7 +108,7 @@ def walk_images(root_folder: Optional[str] = None) -> Iterator[str]:
         raise OSError(f"Не удалось обойти дерево директорий: {e}") from e
 
 
-def build_folder_tree(base_path: str, relative: str, metadata_store) -> Dict[str, Any]:
+def build_folder_tree(base_path: str, relative: str = "") -> Dict[str, Any]:
     tree: Dict[str, Any] = {}
     full_path = os.path.join(base_path, relative)
 
@@ -136,14 +118,13 @@ def build_folder_tree(base_path: str, relative: str, metadata_store) -> Dict[str
                 continue
 
             rel_path = os.path.join(relative, entry.name).replace("\\", "/")
-            total_count, unchecked_count = count_images_in_dir(entry.path, metadata_store)
-            children = build_folder_tree(base_path, rel_path, metadata_store)
+            total_count = count_images_in_dir(entry.path)
+            children = build_folder_tree(base_path, rel_path)
 
             if total_count > 0 or children:
                 tree[rel_path] = {
                     "name": entry.name,
                     "total": total_count,
-                    "unchecked": unchecked_count,
                     "children": children
                 }
     except OSError as e:

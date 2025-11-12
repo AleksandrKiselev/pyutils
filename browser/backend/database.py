@@ -273,19 +273,6 @@ class DatabaseManager:
             logger.warning(f"Ошибка batch чтения метаданных по ID: {e}")
         return result
     
-    def get_by_image_path(self, image_path: str) -> Optional[Dict[str, Any]]:
-        """Получает метаданные по пути изображения"""
-        if self._memory_conn is None:
-            return None
-        try:
-            cursor = self._memory_conn.cursor()
-            cursor.execute("SELECT * FROM metadata WHERE image_path = ?", (image_path,))
-            row = cursor.fetchone()
-            return self._row_to_dict(row) if row else None
-        except Exception as e:
-            logger.warning(f"Ошибка получения метаданных по пути {image_path}: {e}")
-            return None
-    
     def has_metadata(self, image_path: str) -> bool:
         """Проверяет наличие метаданных для изображения"""
         if self._memory_conn is None:
