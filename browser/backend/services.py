@@ -66,31 +66,26 @@ class ImageService:
         if not metadata_ids:
             return 0
         
-        # Получаем все метаданные батчем
         all_metadata = metadata_store.get_by_ids(metadata_ids)
         if not all_metadata:
             return 0
         
-        # Удаляем файлы изображений и миниатюр, собираем ID для удаления метаданных
         ids_to_delete_metadata = []
         for metadata_id, metadata in all_metadata.items():
             try:
                 image_path, thumb_path = get_absolute_paths(metadata)
                 file_deleted = False
                 
-                # Удаляем файл изображения (если существует)
                 if os.path.exists(image_path):
                     try:
                         os.remove(image_path)
                         file_deleted = True
                     except OSError as e:
                         logger.warning(f"Ошибка удаления файла изображения {image_path}: {e}")
-                        continue  # Пропускаем, если не удалось удалить существующий файл
+                        continue
                 else:
-                    # Файл уже удален, но метаданные остались - удаляем их (cleanup)
                     file_deleted = True
                 
-                # Удаляем миниатюру (если существует)
                 if os.path.exists(thumb_path):
                     try:
                         os.remove(thumb_path)
@@ -102,7 +97,6 @@ class ImageService:
             except Exception as e:
                 logger.warning(f"Ошибка обработки изображения {metadata.get('image_path', 'unknown')}: {e}")
         
-        # Удаляем метаданные батчем
         if ids_to_delete_metadata:
             metadata_store.delete(ids_to_delete_metadata)
         
@@ -110,20 +104,16 @@ class ImageService:
 
     @staticmethod
     def get_unchecked_prompts(folder_path: Optional[str], search: str, sort_by: str = "date", order: str = "desc") -> List[str]:
-        """Получает промпты всех неотмеченных изображений с учетом сортировки"""
         images = _get_filtered_images(folder_path, search)
-        # Фильтруем неотмеченные
         unchecked_images = [
             img for img in images 
             if not img.get("checked", False)
         ]
-        # Сортируем
         if sort_by == "random":
             if unchecked_images:
                 unchecked_images = random.sample(unchecked_images, len(unchecked_images))
         else:
             unchecked_images = sort_images(unchecked_images, sort_by, order)
-        # Извлекаем промпты, фильтруем пустые и убираем дубликаты с сохранением порядка
         unchecked_prompts = []
         seen = set()
         for img in unchecked_images:

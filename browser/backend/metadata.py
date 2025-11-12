@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, List
 
 from paths import get_relative_path, get_thumbnail_path
 from config import config
-from tag import extract_tags_from_prompt
+from tag import get_tags_for_image
 from database import DatabaseManager
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,6 @@ class MetadataStore:
         relative = get_relative_path(folder_path).replace("\\", "/")
         normalized = relative.strip("/")
         
-        # Если путь совпадает с корневой директорией, возвращаем файлы в корне
         if not normalized:
             return self._db_manager.get_by_folder("")
         
@@ -149,9 +148,9 @@ class MetadataStore:
             logger.warning(f"Ошибка получения пути миниатюры для {image_path}: {e}")
         
         try:
-            tags = extract_tags_from_prompt(image_path, prompt)
+            tags = get_tags_for_image(image_path)
         except Exception as e:
-            logger.warning(f"Ошибка извлечения тегов из {image_path}: {e}")
+            logger.warning(f"Ошибка генерации тегов для {image_path}: {e}")
         
         return {
             "prompt": prompt or "",

@@ -13,12 +13,13 @@ dependencies:
   - pytorch                 # PyTorch — основная библиотека DL.
   - torchvision             # PyTorch для работы с изображениями.
   - pytorch-cuda=12.1       # Поддержка CUDA для PyTorch (если есть GPU).
+  - cudnn=9.3.0.75          # cuDNN 9.3 для CUDA 12.6 (требуется для onnxruntime-gpu)
   - safetensors             # Сохранение моделей в формате safetensors
   - fuzzywuzzy              # Используется для сравнения строк и вычисления их похожести.
   - python-levenshtein      # Нужно для fuzzywuzzy.
   - plotly                  # Интерактивные графики.
   - tqdm                    # Прогресс-бар
-  - pip
+  - pip                     # Менеджер пакетов Python (обязательно для установки пакетов из git)
   - pip:
       - kaggle              # Загрузка датасетов с Kaggle.
       - dataset             # Hugging Face Datasets для работы с различными наборами данных.
@@ -37,3 +38,7 @@ dependencies:
       - pillow_heif         # Извлечение метаданных из изображения
       - pillow>=9.0.0       # Работа с изображениями
       - opencv-python>=4.8  # Быстрая обработка изображений для создания миниатюр
+      - transformers>=4.30.0 # Hugging Face Transformers для CLIP, BLIP и других ML моделей
+      # ONNX Runtime для WD14 Tagger
+      - onnxruntime-gpu>=1.17.0 # ONNX Runtime для CPU (требуется >=1.17.0 для SmilingWolf/wd-v1-4-swinv2-tagger-v2)
+      - huggingface_hub>=0.20.0 # Загрузка моделей с Hugging Face для WD14 Tagger

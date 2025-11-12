@@ -89,7 +89,6 @@ class DatabaseManager:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookmarks_metadata_id ON bookmarks(metadata_id)")
             self._memory_conn.commit()
             
-            # Создаем все индексы (на случай если какие-то отсутствуют)
             self._create_missing_indexes()
     
     def _get_db_path(self) -> str:
@@ -176,7 +175,6 @@ class DatabaseManager:
             if row_count > 0:
                 logger.info(f"Загружено {row_count} записей с диска")
             
-            # Создаем недостающие индексы для существующей БД
             self._create_missing_indexes()
             
             return True
@@ -185,7 +183,6 @@ class DatabaseManager:
             return False
     
     def _create_missing_indexes(self) -> None:
-        """Создает недостающие индексы для существующей БД"""
         if self._memory_conn is None:
             return
         
@@ -265,8 +262,6 @@ class DatabaseManager:
         }
     
     def _dict_to_row(self, metadata: Dict[str, Any]) -> tuple:
-        """Преобразует словарь в кортеж для вставки в БД"""
-        # Убеждаемся, что все значения имеют правильный тип
         metadata_id = metadata.get("id")
         if not metadata_id:
             raise ValueError(f"ID метаданных не найден или пуст: {metadata}")
@@ -355,7 +350,7 @@ class DatabaseManager:
             else:
                 normalized = relative_folder.replace("\\", "/").rstrip("/")
                 pattern = f"{normalized}/%"
-                start_index = len(normalized) + 2  # смещение после "<folder>/"
+                start_index = len(normalized) + 2
                 cursor.execute(
                     """
                     SELECT * FROM metadata

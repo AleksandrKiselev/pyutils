@@ -4,6 +4,9 @@
     "thumbnail_size": 512,
     "items_per_page": 20,
     "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp", ".webm"],
+    "auto_tag_enabled": true,
+    "auto_tag_method": "wd14",
+    "auto_tag_threshold": 0.3771,
     "auto_tags": [
         "1boy", "1girl", "1male", "2boys", "2girls", "2males", "3boys", "3girls", "3males",
         "gangbang", "group sex", "multiple males", "orgy", "solo", "threesome",

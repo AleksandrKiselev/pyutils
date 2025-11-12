@@ -12,7 +12,6 @@ from config import config
 
 logger = logging.getLogger(__name__)
 
-# Блокировки для предотвращения параллельного создания метаданных для одной папки
 _folder_locks: Dict[str, threading.Lock] = {}
 _locks_lock = threading.Lock()
 
@@ -132,7 +131,6 @@ def filter_images(images, search):
             return [img for img in unchecked_images if raw in img.get("prompt", "").lower()]
         return filter_images(unchecked_images, raw)
 
-    # Фильтр отмеченных изображений
     if search.startswith("c:"):
         raw = search.split(":", 1)[1].strip().lower()
         checked_images = [img for img in images if img.get("checked", False)]
@@ -170,7 +168,6 @@ def filter_images(images, search):
             prompt = img.get("prompt", "").strip().lower()
             if prompt in duplicate_prompts:
                 result.append(img)
-        # Сортируем по промпту, чтобы одинаковые промпты шли рядом (попарно)
         result.sort(key=lambda img: img.get("prompt", "").strip().lower())
         return result
 
