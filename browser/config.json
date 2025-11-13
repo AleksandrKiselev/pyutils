@@ -3,63 +3,8 @@
     "favorites_folder": "d:\\AI-Software\\configs\\images\\favorites",
     "thumbnail_size": 512,
     "items_per_page": 20,
-    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp", ".webm"],
+    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp"],
     "auto_tag_enabled": true,
     "auto_tag_method": "wd14",
-    "auto_tag_threshold": 0.3771,
-    "auto_tags": [
-        "1boy", "1girl", "1male", "2boys", "2girls", "2males", "3boys", "3girls", "3males",
-        "gangbang", "group sex", "multiple males", "orgy", "solo", "threesome",
-
-        "arched back", "arms behind back", "arms up", "ass up", "bent over", "face down", "jack-o-pose",
-        "kneeling", "legs apart", "legs lift", "legs spread", "legs together", "legs up", "legs rise",
-        "lying", "on all fours", "one leg raised", "sitting", "squatting", "standing", "straddling", "top-down bottom-up",
-
-        "cowgirl", "doggystyle", "full nelson", "missionary", "riding", "spitroast",
-
-        "anal", "assjob", "blowjob", "buttjob", "deepthroat", "double penetration", "facefuck", "fellatio",
-        "footjob", "hairjob", "handjob", "licking cock", "oral", "paizuri", "thighjob", "tittyfuck",
-        "triple penetration", "vaginal", "worship",
-
-        "bukkake", "creampie", "cum", "cumshot", "ejaculation", "facial", "precum", "semen", "squirting",
-
-        "cuddling", "fingering", "grub", "hugging", "kissing", "masturbation", "pull", "rape", "rough sex", "slap", "spank",
-
-        "cervix", "cross-section", "fertilization", "impregnation", "ovulation", "pregnant", "uterus", "x-ray",
-
-        "3/4 side view", "back view", "close-up", "from above", "from behind", "from below", "from front",
-        "front view", "full body", "high angle", "low angle", "pov", "rear view", "side view", "wide angle",
-
-        "dutch angle", "motion blur", "motion lines", "recording", "selfie", "sound effects", "spoken heart", "unique perspective",
-
-        "ahegao", "angry", "closed eyes", "coy eyes", "crying", "doe eyes", "drool", "embarrassed", "exhausted",
-        "eyes crossed", "eyes rolled up", "fucked silly", "half-lidded eyes", "happy", "heart-shaped eyes",
-        "heart-shaped pupils", "horny", "lustful", "moan", "naughty", "orgasm", "parted lips", "playful",
-        "sad", "scared", "seductive", "shocked", "shy", "smile", "smirk", "surprised", "tears", "wide eyes", "worried",
-
-        "anus", "areola", "armpits", "arms", "ass", "asshole", "balls", "belly", "breasts", "clitor", "cock",
-        "feet", "fingers", "glans", "hands", "huge breasts", "large breasts", "labia", "legs", "medium breasts",
-        "navel", "nipples", "penis", "pubic hair", "pussy", "small breasts", "testicles", "thighs", "toes",
-
-        "2koma", "character sheet", "multiple views", "split view",
-
-        "bikini", "blindfold", "boots", "bottomless", "bunny suit", "choker", "collar", "corset", "dress",
-        "fishnets", "gag", "garter belt", "glasses", "high heels", "jeans", "jewelry", "latex", "leash",
-        "leather", "lingerie", "maid outfit", "nude", "panties", "pantyhose", "schoolgirl", "shirt", "shorts",
-        "skirt", "stockings", "swimsuit", "thighhighs", "topless",
-
-        "aqua hair", "black hair", "blonde", "blue hair", "bob cut", "braid", "brown hair", "curly hair",
-        "ginger hair", "gray hair", "green hair", "hair bun", "hime cut", "long hair", "medium hair",
-        "messy hair", "orange hair", "pink hair", "ponytail", "purple hair", "red hair", "redhead",
-        "short hair", "silver hair", "straight hair", "twin tails", "wavy hair", "white hair",
-
-        "brown eyes", "blue eyes", "green eyes", "heterochromia", "red eyes", "yellow eyes",
-
-        "child", "freckles", "interracial", "loli", "mature", "milf", "muscular", "petite", "short", "size difference", "tall", "young",
-
-        "anime", "bathroom", "beach", "bedroom", "best quality", "bimbo", "cyberpunk", "day", "elf", "fantasy",
-        "glowing", "goth", "high quality", "indoor", "magic", "makeup", "masterpiece", "medieval", "night",
-        "orc", "outdoor", "particles", "realism", "realistic", "simple background", "slut", "sparkles",
-        "sunset", "sweaty", "tentacles", "white background", "witch", "wet"
-    ]
+    "auto_tag_threshold": 0.3771
 }

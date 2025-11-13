@@ -14,6 +14,7 @@ from services import ImageService, MetadataService, FavoritesService, BookmarksS
 from progress import progress_manager
 from image import collect_images, needs_processing
 from metadata import metadata_store
+from tag import release_model_resources
 
 logger = logging.getLogger(__name__)
 routes = Blueprint("routes", __name__)
@@ -316,6 +317,10 @@ def process_images():
         except Exception as e:
             logger.exception(f"Ошибка обработки изображений: {e}")
             progress_manager.error(task_id, str(e))
+        finally:
+            # Гарантируем освобождение ресурсов модели даже при ошибке
+            if config.AUTO_TAG_ENABLED:
+                release_model_resources()
 
     threading.Thread(target=process_task, daemon=True).start()
     return jsonify({"success": True, "task_id": task_id})

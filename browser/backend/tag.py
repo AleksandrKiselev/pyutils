@@ -3,6 +3,7 @@
 import os
 import logging
 import threading
+import gc
 from typing import List, Optional
 
 import onnxruntime as ort
@@ -222,3 +223,62 @@ def get_tags(image_path: str, enabled: bool = True, threshold: Optional[float] =
     
     abs_image_path = os.path.abspath(image_path) if not os.path.isabs(image_path) else image_path
     return _tag_generator.generate(abs_image_path, threshold=threshold)
+
+
+def release_model_resources():
+    """
+    Освобождает ресурсы модели WD14 Tagger из памяти GPU/CPU.
+    Вызывается после завершения batch обработки изображений.
+    """
+    global _tag_generator, _wd14_model_cache, _wd14_tags_cache
+    
+    with _wd14_loading_lock:
+        model_was_loaded = _wd14_model_cache is not None
+        
+        if model_was_loaded:
+            logger.info("Освобождение ресурсов WD14 Tagger модели...")
+            
+            # Определяем, использовался ли GPU
+            used_gpu = False
+            try:
+                if _wd14_model_cache is not None:
+                    providers = _wd14_model_cache.get_providers()
+                    used_gpu = 'CUDAExecutionProvider' in providers
+            except Exception:
+                pass
+            
+            # Закрываем сессию ONNX Runtime, если есть метод close
+            try:
+                if hasattr(_wd14_model_cache, 'close'):
+                    _wd14_model_cache.close()
+            except Exception as e:
+                logger.debug(f"Ошибка при закрытии ONNX сессии: {e}")
+            
+            # Очищаем кэш модели
+            _wd14_model_cache = None
+            _wd14_tags_cache = None
+        
+        # Очищаем генератор тегов
+        if _tag_generator is not None:
+            _tag_generator._model = None
+            _tag_generator._tags_df = None
+            _tag_generator = None
+        
+        if model_was_loaded:
+            # Принудительная сборка мусора для освобождения памяти
+            gc.collect()
+            
+            # Очистка CUDA кэша, если модель использовала GPU или CUDA доступен
+            if used_gpu:
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                        logger.info("CUDA кэш очищен")
+                except ImportError:
+                    # PyTorch не установлен, но ONNX Runtime может использовать CUDA напрямую
+                    pass
+                except Exception as e:
+                    logger.debug(f"Ошибка при очистке CUDA кэша: {e}")
+            
+            logger.info("Ресурсы WD14 Tagger модели освобождены")

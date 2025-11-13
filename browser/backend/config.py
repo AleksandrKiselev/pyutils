@@ -11,7 +11,7 @@ DEFAULT_CONFIG = {
     "favorites_folder": "static/images/favorites",
     "thumbnail_size": 512,
     "items_per_page": 20,
-    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp", ".webm"],
+    "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp"],
     "metadata_folder": ".metadata",
     "database_name": "metadata.db",
     "favorite_tag": "favorite",
