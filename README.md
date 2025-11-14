@@ -39,7 +39,13 @@ conda env export > environment.yml
 ### Обновление
 
 ```bash
+# Обновить окружение из environment.yml
+conda env update -f environment.yml --prune
+
+# Обновить все пакеты в текущем окружении
 conda update --all
+
+# Обновить конкретный пакет
 conda update package_name
 ```
 

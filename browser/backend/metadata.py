@@ -10,7 +10,7 @@ import uuid
 import atexit
 from typing import Dict, Any, Optional, List
 
-from paths import get_relative_path, get_thumbnail_path
+from paths import get_relative_path
 from config import config
 from tag import get_tags
 from database import DatabaseManager
@@ -125,7 +125,6 @@ class MetadataStore:
         size = 0
         file_hash = ""
         rel_image_path = ""
-        rel_thumb_path = ""
         tags = []
         
         try:
@@ -149,13 +148,6 @@ class MetadataStore:
             logger.warning(f"Ошибка получения относительного пути для {image_path}: {e}")
         
         try:
-            thumb_path = get_thumbnail_path(image_path)
-            if thumb_path:
-                rel_thumb_path = get_relative_path(thumb_path)
-        except Exception as e:
-            logger.warning(f"Ошибка получения пути миниатюры для {image_path}: {e}")
-        
-        try:
             tags = get_tags(image_path, enabled=config.AUTO_TAG_ENABLED)
         except Exception as e:
             logger.warning(f"Ошибка генерации тегов для {image_path}: {e}")
@@ -168,7 +160,6 @@ class MetadataStore:
             "size": int(size) if size else 0,
             "hash": file_hash or "",
             "image_path": rel_image_path or "",
-            "thumb_path": rel_thumb_path or "",
             "id": str(uuid.uuid4())
         }
     

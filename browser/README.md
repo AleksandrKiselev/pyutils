@@ -18,9 +18,10 @@
 ## Установка
 
 ```bash
-# Создать/обновить conda окружение
+# Создать новое conda окружение
 conda env create -f ../environment.yml
-# или если окружение уже есть:
+
+# Или обновить существующее окружение
 conda env update -f ../environment.yml --prune
 
 # Активировать окружение

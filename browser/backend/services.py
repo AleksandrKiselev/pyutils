@@ -6,14 +6,24 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Optional
 
-from paths import get_absolute_path, get_relative_path, get_absolute_paths, get_thumbnail_path
+from paths import get_absolute_path, get_relative_path
 from metadata import metadata_store
 from image import filter_images, sort_images
 from thumbnail import ThumbnailService
 from config import config
-from thumbnail_cache import invalidate_thumbnail_cache
 
 logger = logging.getLogger(__name__)
+
+_CLIENT_METADATA_FIELDS = {"id", "prompt", "size", "rating", "tags", "checked"}
+
+
+def _filter_metadata_for_client(metadata: Dict) -> Dict:
+    """Фильтрует метаданные, оставляя только поля, нужные клиенту"""
+    filtered = {k: v for k, v in metadata.items() if k in _CLIENT_METADATA_FIELDS}
+    image_path = metadata.get("image_path", "")
+    if image_path:
+        filtered["filename"] = os.path.basename(image_path)
+    return filtered
 
 
 def _get_filtered_images(folder_path: Optional[str], search: str, hide_checked: bool = False) -> List[Dict]:
@@ -45,18 +55,12 @@ class ImageService:
             page_images = images[offset:offset + limit]
         
         ThumbnailService.ensure_thumbnails(page_images)
-        
-        return page_images
+        return [_filter_metadata_for_client(img) for img in page_images]
 
     @staticmethod
     def delete_image(metadata_id: str) -> None:
         metadata = _get_metadata_or_raise(metadata_id)
-        _, thumb = get_absolute_paths(metadata)
         os.remove(get_absolute_path(metadata["image_path"]))
-        if os.path.exists(thumb):
-            # Инвалидируем кэш перед удалением
-            invalidate_thumbnail_cache(thumb)
-            os.remove(thumb)
         metadata_store.delete([metadata_id])
 
     @staticmethod
@@ -70,35 +74,19 @@ class ImageService:
             return 0
         
         all_metadata = metadata_store.get_by_ids(metadata_ids)
-        if not all_metadata:
-            return 0
-        
         ids_to_delete_metadata = []
         for metadata_id, metadata in all_metadata.items():
             try:
-                image_path, thumb_path = get_absolute_paths(metadata)
-                file_deleted = False
+                image_path = get_absolute_path(metadata.get("image_path", ""))
                 
                 if os.path.exists(image_path):
                     try:
                         os.remove(image_path)
-                        file_deleted = True
                     except OSError as e:
                         logger.warning(f"Ошибка удаления файла изображения {image_path}: {e}")
                         continue
-                else:
-                    file_deleted = True
                 
-                if os.path.exists(thumb_path):
-                    try:
-                        # Инвалидируем кэш перед удалением
-                        invalidate_thumbnail_cache(thumb_path)
-                        os.remove(thumb_path)
-                    except OSError as e:
-                        logger.warning(f"Ошибка удаления миниатюры {thumb_path}: {e}")
-                
-                if file_deleted:
-                    ids_to_delete_metadata.append(metadata_id)
+                ids_to_delete_metadata.append(metadata_id)
             except Exception as e:
                 logger.warning(f"Ошибка обработки изображения {metadata.get('image_path', 'unknown')}: {e}")
         
@@ -184,7 +172,6 @@ class FavoritesService:
 
         new_metadata = metadata.copy()
         new_metadata["image_path"] = get_relative_path(dst)
-        new_metadata["thumb_path"] = get_relative_path(get_thumbnail_path(dst))
         new_metadata["id"] = str(uuid.uuid4())
 
         tags = set(new_metadata.get("tags", []))
@@ -201,7 +188,11 @@ class BookmarksService:
     
     @staticmethod
     def add(metadata_id: str, image_data: Dict) -> None:
-        image_path = image_data.get("image_path", "")
+        metadata = metadata_store.get_by_ids([metadata_id]).get(metadata_id)
+        if not metadata:
+            raise FileNotFoundError(f"Метаданные с ID {metadata_id} не найдены")
+        
+        image_path = metadata.get("image_path", "")
         path_parts = image_path.split("/") if "/" in image_path else image_path.split("\\")
         filename = path_parts[-1] if path_parts else ""
         folder_path = "/".join(path_parts[:-1]) if len(path_parts) > 1 else ""
@@ -211,7 +202,7 @@ class BookmarksService:
             "metadata_id": metadata_id,
             "image_path": image_path,
             "folder_path": folder_path,
-            "prompt": image_data.get("prompt", ""),
+            "prompt": image_data.get("prompt", "") or metadata.get("prompt", ""),
             "filename": filename,
             "sort_by": image_data.get("sort_by", "date-desc"),
             "search_query": image_data.get("search_query", "")

@@ -130,37 +130,12 @@ const gallery = {
                 rating.updateStars(null, metadataId, img?.rating || 0);
             });
             
+            await gallery.loadThumbnails(images.map(img => img?.id).filter(Boolean));
+            
             // Для случайной сортировки не увеличиваем offset, чтобы загрузка продолжалась бесконечно
             // Для обычной сортировки увеличиваем offset как обычно
             if (!isRandom) {
                 state.offset += images.length;
-            }
-
-            const containers = DOM.gallery ? DOM.gallery.querySelectorAll(".image-container:not(.image-loaded)") : [];
-            if (containers.length > 0) {
-                const preloadImages = () => {
-                    Array.from(containers).forEach(container => {
-                        const img = container.querySelector("img");
-                        if (!img) return;
-
-                        if (img.complete) {
-                            container.classList.add("image-loaded");
-                        } else {
-                            img.onload = () => {
-                                container.classList.add("image-loaded");
-                            };
-                            img.onerror = () => {
-                                container.classList.add("image-loaded");
-                            };
-                        }
-                    });
-                };
-
-                if (window.requestIdleCallback) {
-                    requestIdleCallback(preloadImages, { timeout: 1000 });
-                } else {
-                    setTimeout(preloadImages, 0);
-                }
             }
         } catch (error) {
             console.error("Ошибка загрузки изображений:", error);
@@ -169,21 +144,48 @@ const gallery = {
         }
     },
 
+    async loadThumbnails(metadataIds) {
+        if (!metadataIds || metadataIds.length === 0) return;
+        
+        try {
+            const response = await fetch("/get_thumbnails", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: metadataIds })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const thumbnails = await response.json();
+            
+            metadataIds.forEach(metadataId => {
+                const thumbnailBase64 = thumbnails[metadataId];
+                if (thumbnailBase64) {
+                    const imgElements = document.querySelectorAll(`img[data-thumbnail-id="${metadataId}"]`);
+                    imgElements.forEach(img => {
+                        img.src = `data:image/avif;base64,${thumbnailBase64}`;
+                    });
+                }
+            });
+        } catch (error) {
+            console.error("Ошибка загрузки миниатюр:", error);
+        }
+    },
+
     renderCards(images, startIndex = null) {
         // Если startIndex не передан, используем state.offset для обратной совместимости
         const baseIndex = startIndex !== null ? startIndex : state.offset;
         
         return images.map((img, index) => {
-            // Все пути хранятся в метаданных
             const metadataId = img?.id || "";
-            const thumbnailPath = img?.thumb_path || "";
-            const imagePath = img?.image_path || "";
             
             const promptText = img.prompt || "";
             const prompt = utils.escapeJS(promptText || "промпт не найден");
             const metadataIdEscaped = utils.escapeJS(metadataId);
             const metadataIdAttrEscaped = metadataId ? metadataId.replace(/"/g, "&quot;").replace(/'/g, "&#39;") : "";
-            const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
+            const filenameOnly = img?.filename || "";
             const filenameOnlyEscaped = utils.escapeJS(filenameOnly);
             const fileSizeFormatted = utils.formatFileSize(img.size || 0);
             const ratingValue = img.rating || 0;
@@ -216,7 +218,7 @@ const gallery = {
                                 ${ratingValue >= star ? STARRED_SYMBOL : UNSTARRED_SYMBOL}
                             </span>`).join("")}
                     </div>
-                    <img src="/serve_thumbnail/${thumbnailPath}" alt="Image" loading="lazy"
+                    <img data-thumbnail-id="${metadataIdEscaped}" alt="Image" loading="lazy"
                          onload="this.parentElement.classList.add('image-loaded')"
                          onmouseenter="gallery.setHoveredPrompt('${prompt}')">
                     <div class="image-filename"><span class="filename-text">${filenameOnlyEscaped}</span> <span class="file-size">${fileSizeFormatted}</span></div>
@@ -267,9 +269,6 @@ const gallery = {
 
     saveCheckboxState(event) {
         const cb = event.target;
-        const img = utils.findImageById(cb.dataset.id);
-        const imagePath = img?.image_path || "";
-        const folderPath = folders.getFolderPathFromImagePath(imagePath);
         
         utils.apiRequest("/update_metadata", {
             body: JSON.stringify({ id: cb.dataset.id, checked: cb.checked })

@@ -127,16 +127,6 @@ const folders = {
         const expanded = item.classList.toggle("expanded");
         children.classList.toggle("hidden", !expanded);
         folders.saveState();
-    },
-
-    getFolderPathFromImagePath(imagePath) {
-        if (!imagePath) return "";
-        const pathParts = imagePath.split("/").filter(p => p);
-        if (pathParts.length > 1) {
-            pathParts.pop(); // Убираем имя файла
-            return pathParts.join("/");
-        }
-        return "";
     }
 };
 

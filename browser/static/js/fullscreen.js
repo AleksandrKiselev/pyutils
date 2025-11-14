@@ -37,10 +37,9 @@ const fullscreen = {
         const data = state.currentImages[state.currentIndex];
         if (!data) return;
 
-        const imagePath = data?.image_path || "";
         const metadataId = data?.id || "";
 
-        if (DOM.fullscreenImg) DOM.fullscreenImg.src = `/serve_image/${imagePath}`;
+        if (DOM.fullscreenImg) DOM.fullscreenImg.src = `/serve_image/${metadataId}`;
 
         if (DOM.fullscreenPrompt) {
             const promptText = data.prompt || "";
@@ -48,7 +47,7 @@ const fullscreen = {
             DOM.fullscreenPrompt.textContent = promptText || "промпт не найден";
         }
 
-        const filenameOnly = imagePath ? imagePath.split(/[/\\]/).pop() : "";
+        const filenameOnly = data?.filename || "";
         if (DOM.fullscreenFilename) {
             DOM.fullscreenFilename.innerHTML = `<span class="filename-text">${filenameOnly}</span> <span class="file-size">${utils.formatFileSize(data.size || 0)}</span>`;
         }
@@ -96,8 +95,6 @@ const fullscreen = {
             }
 
             const metadataId = data?.id || "";
-            const imagePath = data?.image_path || "";
-            const folderPath = folders.getFolderPathFromImagePath(imagePath);
             
             utils.apiRequest("/update_metadata", {
                 body: JSON.stringify({ id: metadataId, checked })

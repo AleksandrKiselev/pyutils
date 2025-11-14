@@ -1,19 +1,11 @@
 import os
-import hashlib
 import logging
-from functools import lru_cache
 from pathlib import Path as PathLib
-from typing import Dict, Any, Iterator, Optional, List, Tuple
+from typing import Dict, Any, Iterator, Optional, List
 
 from config import config
 
 logger = logging.getLogger(__name__)
-
-
-@lru_cache(maxsize=10000)
-def _get_filename_hash(image_path: str) -> str:
-    filename = os.path.basename(image_path)
-    return hashlib.md5(filename.encode('utf-8')).hexdigest()
 
 
 def count_images_in_dir(dir_path: str) -> int:
@@ -27,16 +19,6 @@ def count_images_in_dir(dir_path: str) -> int:
     except OSError as e:
         logger.warning(f"Ошибка подсчета изображений в {dir_path}: {e}")
         return 0
-
-
-def get_thumbnail_path(image_path: str) -> str:
-    rel_path = get_relative_path(image_path)
-    rel_dir = PathLib(rel_path).parent
-    meta_dir = PathLib(config.IMAGE_FOLDER) / config.METADATA_FOLDER / rel_dir
-    meta_dir.mkdir(parents=True, exist_ok=True)
-
-    filename_hash = _get_filename_hash(image_path)
-    return str(meta_dir / f"{filename_hash}{config.THUMBNAIL_EXTENSION}")
 
 
 def get_absolute_path(relative_path: str, root_folder: Optional[str] = None) -> str:
@@ -68,29 +50,29 @@ def get_image_paths(folder: Optional[str] = None) -> List[str]:
     return list(walk_images())
 
 
-def get_absolute_paths(metadata: Dict[str, Any], root_folder: Optional[str] = None) -> Tuple[str, str]:
-    required_keys = ["image_path", "thumb_path"]
-    missing = [key for key in required_keys if not metadata.get(key)]
-    if missing:
-        raise ValueError(f"В метаданных отсутствуют пути: {', '.join(missing)}")
-
-    return tuple(get_absolute_path(metadata[key], root_folder) for key in required_keys)
-
-
 def get_relative_path(absolute_path: str, root_folder: Optional[str] = None) -> str:
     if root_folder is None:
         root_folder = config.IMAGE_FOLDER
 
+    if not absolute_path:
+        return ""
+    
+    abs_path = os.path.normpath(os.path.abspath(absolute_path))
+    root = os.path.normpath(os.path.abspath(root_folder))
+    
     try:
-        abs_path = PathLib(absolute_path).resolve()
-        root = PathLib(root_folder).resolve()
-        rel_path = abs_path.relative_to(root)
+        abs_path_lib = PathLib(abs_path).resolve()
+        root_lib = PathLib(root).resolve()
+        rel_path = abs_path_lib.relative_to(root_lib)
         return str(rel_path).replace("\\", "/")
     except (ValueError, TypeError):
         try:
-            return str(PathLib(absolute_path).relative_to(PathLib(root_folder))).replace("\\", "/")
-        except (ValueError, TypeError):
-            return absolute_path.replace(root_folder, "").lstrip(os.sep).replace("\\", "/")
+            if abs_path.startswith(root):
+                rel_path = abs_path[len(root):].lstrip(os.sep)
+                return rel_path.replace("\\", "/")
+        except:
+            pass
+        return absolute_path.replace(root_folder, "").lstrip(os.sep).replace("\\", "/")
 
 
 def walk_images(root_folder: Optional[str] = None) -> Iterator[str]:

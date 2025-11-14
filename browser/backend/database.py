@@ -39,6 +39,7 @@ class DatabaseManager:
     def __init__(self, save_debounce: float = 5.0):
         self._memory_conn: sqlite3.Connection | None = None
         self._save_timer = DebounceTimer(save_debounce)
+        self._read_lock = threading.RLock()
     
     def init_database(self) -> None:
         """Инициализирует БД: создает соединение, таблицу и загружает данные с диска"""
@@ -59,7 +60,7 @@ class DatabaseManager:
                     size INTEGER NOT NULL DEFAULT 0,
                     hash TEXT NOT NULL DEFAULT '',
                     image_path TEXT NOT NULL UNIQUE,
-                    thumb_path TEXT NOT NULL DEFAULT '',
+                    thumbnail_data BLOB,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -121,7 +122,7 @@ class DatabaseManager:
                     "size": "INTEGER",
                     "hash": "TEXT",
                     "image_path": "TEXT",
-                    "thumb_path": "TEXT",
+                    "thumbnail_data": "BLOB",
                     "created_at": "TIMESTAMP",
                     "updated_at": "TIMESTAMP"
                 }
@@ -135,6 +136,7 @@ class DatabaseManager:
                 text_types = {"TEXT", "VARCHAR", "CHAR", "CLOB"}
                 integer_types = {"INTEGER", "INT"}
                 timestamp_types = {"TIMESTAMP", "DATETIME", "TEXT"}
+                blob_types = {"BLOB", "BINARY"}
                 
                 for col_name, expected_type in expected_columns.items():
                     actual_type = columns[col_name]
@@ -144,6 +146,8 @@ class DatabaseManager:
                         type_mismatches.append(f"{col_name}: ожидается INTEGER, найдено {actual_type}")
                     elif expected_type == "TIMESTAMP" and actual_type not in timestamp_types:
                         type_mismatches.append(f"{col_name}: ожидается TIMESTAMP, найдено {actual_type}")
+                    elif expected_type == "BLOB" and actual_type not in blob_types:
+                        type_mismatches.append(f"{col_name}: ожидается BLOB, найдено {actual_type}")
                 
                 if type_mismatches:
                     logger.warning(f"Несоответствие типов в таблице на диске: {type_mismatches}")
@@ -211,16 +215,12 @@ class DatabaseManager:
                 
                 try:
                     abs_image_path = get_absolute_path(rel_image_path)
-                    
-                    # Проверка существования файла
                     if not os.path.exists(abs_image_path) or not os.path.isfile(abs_image_path):
                         deleted_ids.append(metadata_id)
-                
                 except Exception as e:
                     logger.warning(f"Ошибка проверки метаданных {metadata_id} ({rel_image_path}): {e}")
                     deleted_ids.append(metadata_id)
             
-            # Удаление несуществующих записей
             if deleted_ids:
                 deleted_count = self.delete(deleted_ids)
                 logger.info(f"Очистка БД завершена: удалено {deleted_count} несуществующих записей")
@@ -306,7 +306,7 @@ class DatabaseManager:
             "size": row["size"] or 0,
             "hash": row["hash"] or "",
             "image_path": row["image_path"],
-            "thumb_path": row["thumb_path"] or ""
+            "thumbnail_data": row["thumbnail_data"]
         }
     
     def _dict_to_row(self, metadata: Dict[str, Any]) -> tuple:
@@ -326,7 +326,9 @@ class DatabaseManager:
         size = int(metadata.get("size", 0) or 0)
         file_hash = metadata.get("hash", "") or ""
         image_path = metadata.get("image_path", "") or ""
-        thumb_path = metadata.get("thumb_path", "") or ""
+        if image_path:
+            image_path = str(image_path).replace("\\", "/")
+        thumbnail_data = metadata.get("thumbnail_data")
         
         return (
             str(metadata_id),
@@ -337,7 +339,7 @@ class DatabaseManager:
             int(size),
             str(file_hash),
             str(image_path),
-            str(thumb_path)
+            thumbnail_data
         )
     
     def get_by_ids(self, metadata_ids: List[str]) -> Dict[str, Dict[str, Any]]:
@@ -346,93 +348,110 @@ class DatabaseManager:
             return {}
         
         result = {}
-        try:
-            placeholders = ",".join("?" * len(metadata_ids))
-            cursor = self._memory_conn.cursor()
-            cursor.execute(f"SELECT * FROM metadata WHERE id IN ({placeholders})", metadata_ids)
-            rows = cursor.fetchall()
-            for row in rows:
-                metadata = self._row_to_dict(row)
-                result[metadata["id"]] = metadata
-        except Exception as e:
-            logger.warning(f"Ошибка batch чтения метаданных по ID: {e}")
+        with self._read_lock:
+            try:
+                placeholders = ",".join("?" * len(metadata_ids))
+                cursor = self._memory_conn.cursor()
+                cursor.execute(f"SELECT * FROM metadata WHERE id IN ({placeholders})", metadata_ids)
+                rows = cursor.fetchall()
+                for row in rows:
+                    metadata = self._row_to_dict(row)
+                    result[metadata["id"]] = metadata
+            except Exception as e:
+                logger.warning(f"Ошибка batch чтения метаданных по ID: {e}")
         return result
     
     def has_metadata(self, image_path: str) -> bool:
         """Проверяет наличие метаданных для изображения"""
         if self._memory_conn is None:
             return False
-        try:
-            cursor = self._memory_conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM metadata WHERE image_path = ?", (image_path,))
-            row = cursor.fetchone()
-            return row[0] > 0 if row else False
-        except Exception as e:
-            logger.warning(f"Ошибка проверки метаданных для {image_path}: {e}")
-            return False
+        with self._read_lock:
+            try:
+                cursor = self._memory_conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM metadata WHERE image_path = ?", (image_path,))
+                row = cursor.fetchone()
+                return row[0] > 0 if row else False
+            except Exception as e:
+                logger.warning(f"Ошибка проверки метаданных для {image_path}: {e}")
+                return False
     
     def get_all(self) -> List[Dict[str, Any]]:
         """Получает все метаданные"""
         if self._memory_conn is None:
             return []
-        try:
-            cursor = self._memory_conn.cursor()
-            cursor.execute("SELECT * FROM metadata")
-            rows = cursor.fetchall()
-            return [self._row_to_dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Ошибка получения всех метаданных: {e}")
-            return []
+        with self._read_lock:
+            try:
+                cursor = self._memory_conn.cursor()
+                cursor.execute("SELECT * FROM metadata")
+                rows = cursor.fetchall()
+                return [self._row_to_dict(row) for row in rows]
+            except Exception as e:
+                logger.error(f"Ошибка получения всех метаданных: {e}")
+                return []
     
     def get_by_folder(self, relative_folder: Optional[str]) -> List[Dict[str, Any]]:
         """Получает метаданные для изображений в указанной директории (без рекурсии)"""
         if self._memory_conn is None:
             return []
         
-        try:
-            cursor = self._memory_conn.cursor()
-            if relative_folder is None:
-                cursor.execute("SELECT * FROM metadata")
-            elif relative_folder == "":
-                cursor.execute("SELECT * FROM metadata WHERE instr(image_path, '/') = 0")
-            else:
-                normalized = relative_folder.replace("\\", "/").rstrip("/")
-                pattern = f"{normalized}/%"
-                start_index = len(normalized) + 2
-                cursor.execute(
-                    """
-                    SELECT * FROM metadata
-                    WHERE image_path LIKE ?
-                      AND instr(substr(image_path, ?), '/') = 0
-                    """,
-                    (pattern, start_index)
-                )
-            rows = cursor.fetchall()
-            return [self._row_to_dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Ошибка получения метаданных для папки '{relative_folder}': {e}")
-            return []
+        with self._read_lock:
+            try:
+                cursor = self._memory_conn.cursor()
+                if relative_folder is None:
+                    cursor.execute("SELECT * FROM metadata")
+                elif relative_folder == "":
+                    cursor.execute("SELECT * FROM metadata WHERE instr(image_path, '/') = 0")
+                else:
+                    normalized = relative_folder.replace("\\", "/").rstrip("/")
+                    pattern = f"{normalized}/%"
+                    start_index = len(normalized) + 2
+                    cursor.execute(
+                        """
+                        SELECT * FROM metadata
+                        WHERE image_path LIKE ?
+                          AND instr(substr(image_path, ?), '/') = 0
+                        """,
+                        (pattern, start_index)
+                    )
+                rows = cursor.fetchall()
+                return [self._row_to_dict(row) for row in rows]
+            except Exception as e:
+                logger.error(f"Ошибка получения метаданных для папки '{relative_folder}': {e}")
+                return []
     
     def get_by_paths(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
         """Получает метаданные для списка путей изображений"""
         if not image_paths or self._memory_conn is None:
             return []
         
-        result: List[Optional[Dict[str, Any]]] = [None] * len(image_paths)
-        path_to_index = {path: idx for idx, path in enumerate(image_paths)}
+        normalized_paths = []
+        path_to_index = {}
+        for idx, path in enumerate(image_paths):
+            if path:
+                normalized = str(path).replace("\\", "/")
+                normalized_paths.append(normalized)
+                path_to_index[normalized] = idx
         
-        try:
-            placeholders = ",".join("?" * len(image_paths))
-            cursor = self._memory_conn.cursor()
-            cursor.execute(f"SELECT * FROM metadata WHERE image_path IN ({placeholders})", image_paths)
-            rows = cursor.fetchall()
-            for row in rows:
-                metadata = self._row_to_dict(row)
-                image_path = metadata.get("image_path")
-                if image_path in path_to_index:
-                    result[path_to_index[image_path]] = metadata
-        except Exception as e:
-            logger.warning(f"Ошибка batch чтения метаданных: {e}")
+        if not normalized_paths:
+            return [None] * len(image_paths)
+        
+        result: List[Optional[Dict[str, Any]]] = [None] * len(image_paths)
+        
+        with self._read_lock:
+            try:
+                placeholders = ",".join("?" * len(normalized_paths))
+                cursor = self._memory_conn.cursor()
+                cursor.execute(f"SELECT * FROM metadata WHERE image_path IN ({placeholders})", normalized_paths)
+                rows = cursor.fetchall()
+                for row in rows:
+                    metadata = self._row_to_dict(row)
+                    image_path = metadata.get("image_path")
+                    if image_path:
+                        normalized_db_path = str(image_path).replace("\\", "/")
+                        if normalized_db_path in path_to_index:
+                            result[path_to_index[normalized_db_path]] = metadata
+            except Exception as e:
+                logger.warning(f"Ошибка batch чтения метаданных: {e}")
         return result
     
     def save(self, metadata_list: List[Dict[str, Any]], force_save: bool = False) -> None:
@@ -444,44 +463,45 @@ class DatabaseManager:
             if not metadata.get("id"):
                 raise ValueError("ID метаданных не найден")
         
-        try:
-            if len(metadata_list) == 1:
-                row_data = self._dict_to_row(metadata_list[0])
-                cursor = self._memory_conn.cursor()
-                cursor.execute("""
-                    INSERT OR REPLACE INTO metadata 
-                    (id, prompt, checked, rating, tags, size, hash, image_path, thumb_path, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, row_data)
-            else:
-                rows_data = []
-                for idx, metadata in enumerate(metadata_list):
-                    try:
-                        row_data = self._dict_to_row(metadata)
-                        rows_data.append(row_data)
-                    except Exception as e:
-                        logger.error(f"Ошибка преобразования метаданных {idx}: {e}, metadata: {metadata}")
-                        raise
+        with self._read_lock:
+            try:
+                if len(metadata_list) == 1:
+                    row_data = self._dict_to_row(metadata_list[0])
+                    cursor = self._memory_conn.cursor()
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO metadata 
+                        (id, prompt, checked, rating, tags, size, hash, image_path, thumbnail_data, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """, row_data)
+                else:
+                    rows_data = []
+                    for idx, metadata in enumerate(metadata_list):
+                        try:
+                            row_data = self._dict_to_row(metadata)
+                            rows_data.append(row_data)
+                        except Exception as e:
+                            logger.error(f"Ошибка преобразования метаданных {idx}: {e}, metadata: {metadata}")
+                            raise
+                    
+                    if not rows_data:
+                        logger.warning("Нет данных для сохранения после преобразования")
+                        return
+                    
+                    cursor = self._memory_conn.cursor()
+                    cursor.executemany("""
+                        INSERT OR REPLACE INTO metadata 
+                        (id, prompt, checked, rating, tags, size, hash, image_path, thumbnail_data, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """, rows_data)
                 
-                if not rows_data:
-                    logger.warning("Нет данных для сохранения после преобразования")
-                    return
-                
-                cursor = self._memory_conn.cursor()
-                cursor.executemany("""
-                    INSERT OR REPLACE INTO metadata 
-                    (id, prompt, checked, rating, tags, size, hash, image_path, thumb_path, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, rows_data)
-            
-            self._memory_conn.commit()
-            if force_save:
-                self.force_save()
-            else:
-                self._schedule_save()
-        except Exception as e:
-            logger.error(f"Ошибка сохранения метаданных: {e}, количество: {len(metadata_list)}")
-            raise
+                self._memory_conn.commit()
+                if force_save:
+                    self.force_save()
+                else:
+                    self._schedule_save()
+            except Exception as e:
+                logger.error(f"Ошибка сохранения метаданных: {e}, количество: {len(metadata_list)}")
+                raise
     
     def delete(self, metadata_ids: List[str], force_save: bool = False) -> int:
         """Удаляет метаданные. Принимает список ID для удаления. Возвращает количество удаленных записей"""

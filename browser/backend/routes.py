@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import base64
 import logging
 import threading
 from functools import wraps
@@ -15,7 +16,6 @@ from progress import progress_manager
 from image import collect_images, needs_processing
 from metadata import metadata_store
 from tag import release_model_resources
-from thumbnail_cache import get_thumbnail_data
 
 logger = logging.getLogger(__name__)
 routes = Blueprint("routes", __name__)
@@ -155,42 +155,66 @@ def get_images(subpath: str = ""):
     return jsonify(images)
 
 
-@routes.route("/serve_image/<path:filename>")
+@routes.route("/serve_image/<metadata_id>")
 @handle_route_errors
-def serve_image(filename: str):
-    """Отдает оригинальное изображение"""
-    path = get_absolute_path(filename)
-    if not os.path.exists(path):
-        raise FileNotFoundError("Файл не найден")
-
-    if not os.path.abspath(path).startswith(os.path.abspath(config.IMAGE_FOLDER)):
-        raise PermissionError("Доступ к файлу запрещен")
-
-    return send_from_directory(config.IMAGE_FOLDER, filename)
-
-
-@routes.route("/serve_thumbnail/<path:filename>")
-@handle_route_errors
-def serve_thumbnail(filename: str):
-    """Отдает миниатюру с кэшированием в памяти"""
-    path = get_absolute_path(filename)
-    if not os.path.exists(path):
-        raise FileNotFoundError("Файл не найден")
-
-    if not os.path.abspath(path).startswith(os.path.abspath(config.IMAGE_FOLDER)):
-        raise PermissionError("Доступ к файлу запрещен")
+def serve_image(metadata_id: str):
+    """Отдает оригинальное изображение по ID метаданных"""
+    metadata_dict = metadata_store.get_by_ids([metadata_id])
     
-    try:
-        # Читаем из кэша (или с диска, если нет в кэше)
-        data = get_thumbnail_data(path)
-        
-        # Определяем MIME тип по расширению
-        ext = os.path.splitext(path)[1].lower()
-        mime_type = "image/webp" if ext == ".webp" else "image/jpeg"
-        return Response(data, mimetype=mime_type)
-    except (IOError, OSError) as e:
-        logger.error(f"Ошибка чтения миниатюры {path}: {e}")
+    if metadata_id not in metadata_dict:
+        raise FileNotFoundError("Метаданные не найдены")
+    
+    metadata = metadata_dict[metadata_id]
+    image_path = metadata.get("image_path", "")
+    
+    if not image_path:
+        raise FileNotFoundError("Путь к изображению не найден")
+    
+    path = get_absolute_path(image_path)
+    if not os.path.exists(path):
         raise FileNotFoundError("Файл не найден")
+
+    if not os.path.abspath(path).startswith(os.path.abspath(config.IMAGE_FOLDER)):
+        raise PermissionError("Доступ к файлу запрещен")
+
+    return send_from_directory(config.IMAGE_FOLDER, image_path)
+
+
+@routes.route("/serve_thumbnail/<metadata_id>")
+@handle_route_errors
+def serve_thumbnail(metadata_id: str):
+    """Отдает миниатюру из БД по ID метаданных"""
+    metadata = metadata_store.get_by_ids([metadata_id]).get(metadata_id)
+    
+    if not metadata:
+        raise FileNotFoundError("Метаданные не найдены")
+    
+    thumbnail_data = metadata.get("thumbnail_data")
+    if not thumbnail_data:
+        raise FileNotFoundError("Миниатюра не найдена в БД")
+    
+    return Response(thumbnail_data, mimetype="image/avif")
+
+
+@routes.route("/get_thumbnails", methods=["POST"])
+@handle_route_errors
+def get_thumbnails():
+    """Отдает миниатюры для списка ID метаданных"""
+    data = _validate_json_request()
+    metadata_ids = data.get("ids", [])
+    
+    if not metadata_ids or not isinstance(metadata_ids, list):
+        raise ValueError("Не указаны ID метаданных")
+    
+    metadata_dict = metadata_store.get_by_ids(metadata_ids)
+    
+    thumbnails = {
+        metadata_id: base64.b64encode(metadata["thumbnail_data"]).decode('utf-8')
+        for metadata_id, metadata in metadata_dict.items()
+        if metadata.get("thumbnail_data")
+    }
+    
+    return jsonify(thumbnails)
 
 
 @routes.route("/delete_image", methods=["POST"])
@@ -367,19 +391,11 @@ def add_bookmark():
     if not metadata_id or not isinstance(metadata_id, str):
         raise ValueError("ID метаданных обязательно и должно быть строкой")
     
-    all_metadata = metadata_store.get_by_ids([metadata_id])
-    if metadata_id not in all_metadata:
-        raise FileNotFoundError(f"Метаданные с ID {metadata_id} не найдены")
-    metadata = all_metadata[metadata_id]
-    
-    image_data = {
-        "image_path": metadata.get("image_path", ""),
-        "prompt": metadata.get("prompt", ""),
+    BookmarksService.add(metadata_id, {
+        "prompt": data.get("prompt", ""),
         "sort_by": data.get("sort_by", "date-desc"),
         "search_query": data.get("search_query", "")
-    }
-    
-    BookmarksService.add(metadata_id, image_data)
+    })
     return jsonify({"success": True})
 
 

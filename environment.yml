@@ -37,7 +37,8 @@ dependencies:
       - fasteners           # Блокировка файлов
       - pillow_heif         # Извлечение метаданных из изображения
       - pillow>=9.0.0       # Работа с изображениями
-      - opencv-python>=4.8  # Быстрая обработка изображений для создания миниатюр
+      - pillow-avif-plugin>=1.4.0 # Поддержка AVIF формата для Pillow
+      - opencv-python>=4.8.0 # Быстрая обработка изображений для создания миниатюр
       - transformers>=4.30.0 # Hugging Face Transformers для CLIP, BLIP и других ML моделей
       # ONNX Runtime для WD14 Tagger
       - onnxruntime-gpu>=1.17.0 # ONNX Runtime для CPU (требуется >=1.17.0 для SmilingWolf/wd-v1-4-swinv2-tagger-v2)
