@@ -56,6 +56,9 @@ def collect_images(folder=None, progress_callback: Optional[Callable[[int, int, 
             total = len(new_images)
             processed_new = 0
             
+            if progress_callback:
+                progress_callback(0, total, f"Найдено {total} новых изображений. Начало обработки...")
+            
             with ThreadPoolExecutor(max_workers=max_workers) as pool:
                 futures = {
                     pool.submit(metadata_store.create_metadata, path): (original_idx, path)
@@ -72,7 +75,7 @@ def collect_images(folder=None, progress_callback: Optional[Callable[[int, int, 
                     processed_new += 1
                     
                     # Обновление прогресс-бара для веб-интерфейса
-                    if progress_callback and total >= 10:
+                    if progress_callback:
                         progress_callback(processed_new, total, f"Создание метаданных {processed_new}/{total}")
                 
                 logger.info(f"Завершено создание метаданных для {len(new_metadata_list)} изображений")

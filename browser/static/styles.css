@@ -1466,6 +1466,15 @@ body.sidebar-visible .sidebar {
     box-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
 }
 
+@keyframes progress-pulse {
+    0% {
+        background-position: 0% 0%;
+    }
+    100% {
+        background-position: 200% 0%;
+    }
+}
+
 .progress-info {
     display: flex;
     justify-content: space-between;

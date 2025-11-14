@@ -39,7 +39,7 @@ const fullscreen = {
 
         const metadataId = data?.id || "";
 
-        if (DOM.fullscreenImg) DOM.fullscreenImg.src = `/serve_image/${metadataId}`;
+        if (DOM.fullscreenImg) DOM.fullscreenImg.src = `/images/${metadataId}`;
 
         if (DOM.fullscreenPrompt) {
             const promptText = data.prompt || "";
@@ -96,7 +96,8 @@ const fullscreen = {
 
             const metadataId = data?.id || "";
             
-            utils.apiRequest("/update_metadata", {
+            utils.apiRequest("/metadata", {
+                method: "POST",
                 body: JSON.stringify({ id: metadataId, checked })
             }).catch(console.error);
         };
@@ -133,7 +134,8 @@ const fullscreen = {
 
                 rating.updateStars(null, metadataId, newRating);
 
-                utils.apiRequest("/update_metadata", {
+                utils.apiRequest("/metadata", {
+                method: "POST",
                     body: JSON.stringify({ id: metadataId, rating: newRating })
                 }).catch(error => {
                     console.error("Ошибка сохранения рейтинга:", error);
@@ -165,8 +167,8 @@ const fullscreen = {
         const metadataId = data?.id || "";
 
         try {
-            const result = await utils.apiRequest("/delete_image", {
-                body: JSON.stringify({ id: metadataId })
+            const result = await utils.apiRequest(`/images/${metadataId}`, {
+                method: "DELETE"
             });
 
             if (result.success) {

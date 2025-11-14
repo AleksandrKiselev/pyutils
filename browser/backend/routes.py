@@ -112,11 +112,12 @@ def index(subpath: str = ""):
     )
 
 
-@routes.route("/images/<path:subpath>")
+@routes.route("/metadata", methods=["GET"])
 @handle_route_errors
-def get_images(subpath: str = ""):
-    folder_path = get_absolute_path(subpath)
-    if not os.path.isdir(folder_path):
+def get_metadata():
+    subpath = request.args.get("path", "")
+    folder_path = get_absolute_path(subpath) if subpath else None
+    if folder_path and not os.path.isdir(folder_path):
         raise FileNotFoundError("Путь не существует")
 
     try:
@@ -139,7 +140,7 @@ def get_images(subpath: str = ""):
     if order not in valid_orders:
         raise ValueError(f"Неверный order: {order}")
 
-    search_folder_path, search = _parse_search_scope(request.args.get("search", ""), folder_path)
+    search_folder_path, search = _parse_search_scope(request.args.get("search", ""), folder_path or "")
     hide_checked = request.args.get("hide_checked", "false").lower() == "true"
 
     images = ImageService.get_images(
@@ -155,9 +156,9 @@ def get_images(subpath: str = ""):
     return jsonify(images)
 
 
-@routes.route("/serve_image/<metadata_id>")
+@routes.route("/images/<metadata_id>")
 @handle_route_errors
-def serve_image(metadata_id: str):
+def get_image(metadata_id: str):
     """Отдает оригинальное изображение по ID метаданных"""
     metadata_dict = metadata_store.get_by_ids([metadata_id])
     
@@ -180,9 +181,9 @@ def serve_image(metadata_id: str):
     return send_from_directory(config.IMAGE_FOLDER, image_path)
 
 
-@routes.route("/serve_thumbnail/<metadata_id>")
+@routes.route("/thumbnails/<metadata_id>")
 @handle_route_errors
-def serve_thumbnail(metadata_id: str):
+def get_thumbnail(metadata_id: str):
     """Отдает миниатюру из БД по ID метаданных"""
     metadata = metadata_store.get_by_ids([metadata_id]).get(metadata_id)
     
@@ -196,9 +197,9 @@ def serve_thumbnail(metadata_id: str):
     return Response(thumbnail_data, mimetype="image/avif")
 
 
-@routes.route("/get_thumbnails", methods=["POST"])
+@routes.route("/thumbnails", methods=["POST"])
 @handle_route_errors
-def get_thumbnails():
+def get_thumbnails_batch():
     """Отдает миниатюры для списка ID метаданных"""
     data = _validate_json_request()
     metadata_ids = data.get("ids", [])
@@ -217,19 +218,16 @@ def get_thumbnails():
     return jsonify(thumbnails)
 
 
-@routes.route("/delete_image", methods=["POST"])
+@routes.route("/images/<metadata_id>", methods=["DELETE"])
 @handle_route_errors
-def delete_image():
-    data = _validate_json_request()
-    metadata_id = data.get("id")
-    if not metadata_id or not isinstance(metadata_id, str):
-        raise ValueError("ID метаданных обязательно и должно быть строкой")
-
+def delete_image(metadata_id: str):
+    if not metadata_id:
+        raise ValueError("ID метаданных обязательно")
     ImageService.delete_image(metadata_id)
     return jsonify({"success": True})
 
 
-@routes.route("/update_metadata", methods=["POST"])
+@routes.route("/metadata", methods=["POST"])
 @handle_route_errors
 def update_metadata():
     data = _validate_json_request()
@@ -250,9 +248,9 @@ def update_metadata():
     return jsonify({"success": True})
 
 
-@routes.route("/copy_to_favorites", methods=["POST"])
+@routes.route("/favorites", methods=["POST"])
 @handle_route_errors
-def copy_to_favorites():
+def add_to_favorites():
     data = _validate_json_request()
     metadata_id = data.get("id")
     if not metadata_id or not isinstance(metadata_id, str):
@@ -262,16 +260,16 @@ def copy_to_favorites():
     return jsonify({"success": True})
 
 
-@routes.route("/uncheck_all", methods=["POST"])
+@routes.route("/metadata/uncheck", methods=["POST"])
 @handle_route_errors
-def uncheck_all():
+def uncheck_metadata():
     data = _validate_json_request()
     search_folder_path, search = _get_validated_path_and_search(data)
     count = MetadataService.uncheck_all(search_folder_path, search)
     return jsonify({"success": True, "count": count})
 
 
-@routes.route("/delete_metadata", methods=["POST"])
+@routes.route("/metadata", methods=["DELETE"])
 @handle_route_errors
 def delete_metadata():
     data = _validate_json_request()
@@ -280,7 +278,7 @@ def delete_metadata():
     return jsonify({"success": True, "count": count})
 
 
-@routes.route("/delete_checked_images", methods=["POST"])
+@routes.route("/images/checked", methods=["DELETE"])
 @handle_route_errors
 def delete_checked_images():
     data = _validate_json_request()
@@ -289,14 +287,17 @@ def delete_checked_images():
     return jsonify({"success": True, "count": count})
 
 
-@routes.route("/get_unchecked_prompts", methods=["POST"])
+@routes.route("/prompts/unchecked", methods=["GET"])
 @handle_route_errors
 def get_unchecked_prompts():
-    data = _validate_json_request()
-    search_folder_path, search = _get_validated_path_and_search(data)
+    subpath = request.args.get("path", "")
+    folder_path = get_absolute_path(subpath) if subpath else None
+    if folder_path and not os.path.isdir(folder_path):
+        raise FileNotFoundError("Путь не существует")
     
-    sort_by = data.get("sort_by", "date")
-    order = data.get("order", "desc")
+    search_folder_path, search = _parse_search_scope(request.args.get("search", ""), folder_path or "")
+    sort_by = request.args.get("sort_by", "date")
+    order = request.args.get("order", "desc")
     valid_sort_fields = {"date", "filename", "prompt", "rating", "tags", "size", "hash", "random"}
     valid_orders = {"asc", "desc"}
     
@@ -306,10 +307,10 @@ def get_unchecked_prompts():
         order = "desc"
     
     prompts = ImageService.get_unchecked_prompts(search_folder_path, search, sort_by, order)
-    return jsonify({"success": True, "prompts": prompts})
+    return jsonify({"prompts": prompts})
 
 
-@routes.route("/check_processing_needed", methods=["POST"])
+@routes.route("/processing/check", methods=["POST"])
 @handle_route_errors
 def check_processing_needed():
     data = _validate_json_request()
@@ -317,8 +318,8 @@ def check_processing_needed():
     return jsonify({"needs_processing": needs_processing(folder=folder_path)})
 
 
-@routes.route("/progress/<task_id>")
-def progress_stream(task_id: str):
+@routes.route("/processing/<task_id>/progress")
+def get_processing_progress(task_id: str):
     def generate():
         while True:
             progress = progress_manager.get(task_id)
@@ -351,19 +352,23 @@ def progress_stream(task_id: str):
     return response
 
 
-@routes.route("/process_images", methods=["POST"])
+@routes.route("/processing/start", methods=["POST"])
 @handle_route_errors
-def process_images():
+def start_processing():
     data = _validate_json_request()
     folder_path = _get_validated_folder_path(data.get("path", ""))
     task_id = progress_manager.create_task()
 
     def process_task():
         try:
+            progress_manager.update(task_id, 0, 0, "Сканирование папки...")
             def progress_callback(processed, total, message):
                 progress_manager.update(task_id, processed, total, message)
-            collect_images(folder=folder_path, progress_callback=progress_callback)
-            progress_manager.complete(task_id, "Завершено")
+            result = collect_images(folder=folder_path, progress_callback=progress_callback)
+            if result:
+                progress_manager.complete(task_id, "Обработка завершена")
+            else:
+                progress_manager.complete(task_id, "Нет изображений для обработки")
         except Exception as e:
             logger.exception(f"Ошибка обработки изображений: {e}")
             progress_manager.error(task_id, str(e))

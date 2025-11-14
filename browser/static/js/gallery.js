@@ -42,12 +42,14 @@ const gallery = {
             let needs_processing = false;
             
             try {
+                progressBar.showChecking("Проверка папки...");
+                
                 const timeoutPromise = new Promise((_, reject) => 
                     setTimeout(() => reject(new Error("Timeout")), 2000)
                 );
                 
                 const checkResponse = await Promise.race([
-                    fetch("/check_processing_needed", {
+                    fetch("/processing/check", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ path: pathToCheck })
@@ -62,10 +64,13 @@ const gallery = {
             }
             
             if (!needs_processing) {
+                progressBar.close();
                 return;
             }
 
-            const response = await fetch("/process_images", {
+            progressBar.showChecking("Запуск обработки...");
+
+            const response = await fetch("/processing/start", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ path: pathToCheck })
@@ -78,13 +83,10 @@ const gallery = {
             }
 
             progressBar.taskId = task_id;
-            // Не показываем прогресс-бар сразу, он покажется только при первом обновлении с total >= 10
             progressBar.connect();
         } catch (error) {
             console.error("Ошибка запуска обработки:", error);
-            if (progressBar.taskId) {
-                progressBar.close();
-            }
+            progressBar.close();
         }
     },
 
@@ -98,7 +100,8 @@ const gallery = {
             
             // Для случайной сортировки offset не важен, но передаем его для совместимости
             const hideCheckedParam = state.hideChecked ? "&hide_checked=true" : "";
-            const query = `/images${window.location.pathname}?limit=${limit}&offset=${state.offset}&search=${encodeURIComponent(state.searchQuery)}&sort_by=${sort}&order=${order}${hideCheckedParam}`;
+            const path = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
+            const query = `/metadata?path=${encodeURIComponent(path)}&limit=${limit}&offset=${state.offset}&search=${encodeURIComponent(state.searchQuery)}&sort_by=${sort}&order=${order}${hideCheckedParam}`;
             const images = await (await fetch(query)).json();
 
             // Для обычной сортировки останавливаемся при пустом массиве (конец пагинации)
@@ -148,7 +151,7 @@ const gallery = {
         if (!metadataIds || metadataIds.length === 0) return;
         
         try {
-            const response = await fetch("/get_thumbnails", {
+            const response = await fetch("/thumbnails", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ids: metadataIds })
@@ -253,8 +256,8 @@ const gallery = {
         if (!confirm("Удалить изображение?")) return;
 
         try {
-            const result = await utils.apiRequest("/delete_image", {
-                body: JSON.stringify({ id: metadataId })
+            const result = await utils.apiRequest(`/images/${metadataId}`, {
+                method: "DELETE"
             });
 
             if (result.success) {
@@ -270,7 +273,8 @@ const gallery = {
     saveCheckboxState(event) {
         const cb = event.target;
         
-        utils.apiRequest("/update_metadata", {
+        utils.apiRequest("/metadata", {
+            method: "POST",
             body: JSON.stringify({ id: cb.dataset.id, checked: cb.checked })
         }).catch(console.error);
     },
@@ -316,7 +320,8 @@ const gallery = {
         const searchQuery = state.searchQuery || "";
 
         try {
-            const result = await utils.apiRequest("/uncheck_all", {
+            const result = await utils.apiRequest("/metadata/uncheck", {
+                method: "POST",
                 body: JSON.stringify({ path: currentPath, search: searchQuery })
             });
 
@@ -371,7 +376,8 @@ const gallery = {
         }
 
         try {
-            const result = await utils.apiRequest("/delete_checked_images", {
+            const result = await utils.apiRequest("/images/checked", {
+                method: "DELETE",
                 body: JSON.stringify({ path: currentPath, search: searchQuery })
             });
 
@@ -401,21 +407,14 @@ const gallery = {
             return;
         }
 
-        const currentPath = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
-        const searchQuery = state.searchQuery || "";
-        const [sort, order] = state.sortBy.split("-");
-
         try {
-            const result = await utils.apiRequest("/get_unchecked_prompts", {
-                body: JSON.stringify({ 
-                    path: currentPath, 
-                    search: searchQuery,
-                    sort_by: sort,
-                    order: order
-                })
-            });
+            const path = window.location.pathname === "/" ? "" : window.location.pathname.replace(/^\//, "");
+            const isGlobalSearch = state.searchQuery && state.searchQuery.trim().toLowerCase().startsWith("g:");
+            const searchPath = isGlobalSearch ? "" : path;
+            const query = `/prompts/unchecked?path=${encodeURIComponent(searchPath)}&search=${encodeURIComponent(state.searchQuery)}&sort_by=${state.sortBy.split("-")[0]}&order=${state.sortBy.split("-")[1] || "desc"}`;
+            const result = await (await fetch(query)).json();
 
-            if (!result.success || !result.prompts) {
+            if (!result.prompts) {
                 toast.show("Ошибка получения промптов", null, 3000);
                 return;
             }

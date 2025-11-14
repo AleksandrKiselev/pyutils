@@ -3,7 +3,8 @@ const favorites = {
         event.stopPropagation();
 
         try {
-            const result = await utils.apiRequest("/copy_to_favorites", {
+            const result = await utils.apiRequest("/favorites", {
+                method: "POST",
                 body: JSON.stringify({ id: metadataId })
             });
 

@@ -26,7 +26,7 @@ class ProgressManager:
                 "total": 0,
                 "processed": 0,
                 "status": "starting",
-                "message": "",
+                "message": "Инициализация обработки...",
                 "created_at": datetime.now(),
                 "error": None
             }

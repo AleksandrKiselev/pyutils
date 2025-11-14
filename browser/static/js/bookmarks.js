@@ -188,8 +188,8 @@ const bookmarks = {
             
             try {
                 const [sort, order] = bookmarkSortBy.split("-");
-                const path = targetFolderPath ? `/${targetFolderPath}` : "";
-                const query = `/images${path}?limit=1000&offset=0&search=${encodeURIComponent(bookmarkSearchQuery)}&sort_by=${sort}&order=${order}`;
+                const path = targetFolderPath || "";
+                const query = `/metadata?path=${encodeURIComponent(path)}&limit=1000&offset=0&search=${encodeURIComponent(bookmarkSearchQuery)}&sort_by=${sort}&order=${order}`;
                 const response = await fetch(query);
                 const images = await response.json();
                 

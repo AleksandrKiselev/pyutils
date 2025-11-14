@@ -11,7 +11,8 @@ const rating = {
 
         rating.updateStars(null, metadataId, newRating);
 
-        utils.apiRequest("/update_metadata", {
+        utils.apiRequest("/metadata", {
+            method: "POST",
             body: JSON.stringify({ id: metadataId, rating: newRating })
         }).catch(error => {
             console.error("Ошибка сохранения рейтинга:", error);
