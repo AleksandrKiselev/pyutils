@@ -1,4 +1,6 @@
 import os
+import sys
+import signal
 import threading
 import webbrowser
 import time
@@ -65,16 +67,35 @@ app = create_app()
 metadata_store.initialize()
 
 
+def _shutdown_handler(signum, frame):
+    """Обработчик сигналов завершения для сохранения БД"""
+    logger.info(f"Получен сигнал {signum}, сохранение БД перед завершением...")
+    try:
+        metadata_store._db_manager.force_save()
+        logger.info("БД успешно сохранена")
+    except Exception as e:
+        logger.error(f"Ошибка сохранения БД при завершении: {e}")
+    sys.exit(0)
+
+
 if __name__ == "__main__":
+    # Регистрация обработчиков сигналов для корректного завершения
+    signal.signal(signal.SIGINT, _shutdown_handler)  # Ctrl+C
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, _shutdown_handler)  # Завершение процесса
+    
     debug_mode = _is_debug_mode()
 
     if _should_open_browser(debug_mode):
         threading.Thread(target=open_browser, daemon=True).start()
 
-    app.run(
-        host=os.getenv("FLASK_HOST", DEFAULT_HOST),
-        port=int(os.getenv("FLASK_PORT", str(DEFAULT_PORT))),
-        debug=debug_mode,
-        use_reloader=debug_mode,
-        threaded=True
-    )
+    try:
+        app.run(
+            host=os.getenv("FLASK_HOST", DEFAULT_HOST),
+            port=int(os.getenv("FLASK_PORT", str(DEFAULT_PORT))),
+            debug=debug_mode,
+            use_reloader=debug_mode,
+            threaded=True
+        )
+    except KeyboardInterrupt:
+        _shutdown_handler(signal.SIGINT, None)

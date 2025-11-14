@@ -11,6 +11,7 @@ from metadata import metadata_store
 from image import filter_images, sort_images
 from thumbnail import ThumbnailService
 from config import config
+from thumbnail_cache import invalidate_thumbnail_cache
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,8 @@ class ImageService:
         _, thumb = get_absolute_paths(metadata)
         os.remove(get_absolute_path(metadata["image_path"]))
         if os.path.exists(thumb):
+            # Инвалидируем кэш перед удалением
+            invalidate_thumbnail_cache(thumb)
             os.remove(thumb)
         metadata_store.delete([metadata_id])
 
@@ -88,6 +91,8 @@ class ImageService:
                 
                 if os.path.exists(thumb_path):
                     try:
+                        # Инвалидируем кэш перед удалением
+                        invalidate_thumbnail_cache(thumb_path)
                         os.remove(thumb_path)
                     except OSError as e:
                         logger.warning(f"Ошибка удаления миниатюры {thumb_path}: {e}")

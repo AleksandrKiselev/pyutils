@@ -181,7 +181,7 @@ class MetadataStore:
             self._db_manager.save(metadata_list, force_save=False)
         else:
             logger.info(f"Начало batch сохранения {len(metadata_list)} метаданных")
-            self._db_manager.save(metadata_list, force_save=True)
+            self._db_manager.save(metadata_list, force_save=False)
             logger.info(f"Завершено batch сохранение {len(metadata_list)} метаданных")
     
     def update(self, updates: List[Dict[str, Any]]) -> int:
@@ -214,11 +214,11 @@ class MetadataStore:
         return len(updated_metadata)
     
     def delete(self, metadata_ids: List[str]) -> int:
-        """Удаляет метаданные. Принимает список ID для удаления. Принудительно сохраняет БД, так как это критическая операция."""
+        """Удаляет метаданные. Принимает список ID для удаления."""
         if not metadata_ids:
             return 0
         
-        return self._db_manager.delete(metadata_ids, force_save=True)
+        return self._db_manager.delete(metadata_ids, force_save=False)
 
 
 metadata_store = MetadataStore()

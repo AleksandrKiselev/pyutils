@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 from config import config
+from paths import get_absolute_path
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +175,7 @@ class DatabaseManager:
             row_count = row[0] if row else 0
             if row_count > 0:
                 logger.info(f"Загружено {row_count} записей с диска")
+                self._cleanup_invalid_metadata()
             
             self._create_missing_indexes()
             
@@ -181,6 +183,52 @@ class DatabaseManager:
         except Exception as e:
             logger.warning(f"Ошибка загрузки данных с диска: {e}")
             return False
+    
+    def _cleanup_invalid_metadata(self) -> None:
+        """Очищает БД от несуществующих метаданных"""
+        if self._memory_conn is None:
+            return
+        
+        try:
+            cursor = self._memory_conn.cursor()
+            cursor.execute("SELECT id, image_path FROM metadata")
+            all_rows = cursor.fetchall()
+            
+            if not all_rows:
+                return
+            
+            deleted_ids = []
+            
+            logger.info(f"Начало очистки БД: проверка {len(all_rows)} записей")
+            
+            for row in all_rows:
+                metadata_id = row["id"]
+                rel_image_path = row["image_path"]
+                
+                if not rel_image_path:
+                    deleted_ids.append(metadata_id)
+                    continue
+                
+                try:
+                    abs_image_path = get_absolute_path(rel_image_path)
+                    
+                    # Проверка существования файла
+                    if not os.path.exists(abs_image_path) or not os.path.isfile(abs_image_path):
+                        deleted_ids.append(metadata_id)
+                
+                except Exception as e:
+                    logger.warning(f"Ошибка проверки метаданных {metadata_id} ({rel_image_path}): {e}")
+                    deleted_ids.append(metadata_id)
+            
+            # Удаление несуществующих записей
+            if deleted_ids:
+                deleted_count = self.delete(deleted_ids)
+                logger.info(f"Очистка БД завершена: удалено {deleted_count} несуществующих записей")
+            else:
+                logger.info("Очистка БД завершена: все записи актуальны")
+        
+        except Exception as e:
+            logger.error(f"Ошибка очистки БД: {e}")
     
     def _create_missing_indexes(self) -> None:
         if self._memory_conn is None:

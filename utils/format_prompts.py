@@ -193,7 +193,7 @@ key_tag_groups = {
 
 
 def process_file(file_path,
-                 filter_similarity_threshold=90,
+                 filter_similarity_threshold=100,
                  sort_by_similarity=False,
                  sort_by_tags=False,
                  sort_by_prompt=True,
@@ -255,5 +255,5 @@ def process_file(file_path,
             f.write('\n'.join(formatted_lines))
 
 
-file_path = r'D:\AI-Software\configs\wildcards\prompt\prompt.txt'
+file_path = r'D:\AI-Software\configs\wildcards\lora\pony\nsfw.txt'
 process_file(file_path)

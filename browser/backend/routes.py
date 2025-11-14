@@ -15,9 +15,11 @@ from progress import progress_manager
 from image import collect_images, needs_processing
 from metadata import metadata_store
 from tag import release_model_resources
+from thumbnail_cache import get_thumbnail_data
 
 logger = logging.getLogger(__name__)
 routes = Blueprint("routes", __name__)
+
 
 ERROR_HANDLERS = {
     FileNotFoundError: (404, lambda e: str(e)),
@@ -154,9 +156,9 @@ def get_images(subpath: str = ""):
 
 
 @routes.route("/serve_image/<path:filename>")
-@routes.route("/serve_thumbnail/<path:filename>")
 @handle_route_errors
-def serve_file(filename: str):
+def serve_image(filename: str):
+    """Отдает оригинальное изображение"""
     path = get_absolute_path(filename)
     if not os.path.exists(path):
         raise FileNotFoundError("Файл не найден")
@@ -165,6 +167,30 @@ def serve_file(filename: str):
         raise PermissionError("Доступ к файлу запрещен")
 
     return send_from_directory(config.IMAGE_FOLDER, filename)
+
+
+@routes.route("/serve_thumbnail/<path:filename>")
+@handle_route_errors
+def serve_thumbnail(filename: str):
+    """Отдает миниатюру с кэшированием в памяти"""
+    path = get_absolute_path(filename)
+    if not os.path.exists(path):
+        raise FileNotFoundError("Файл не найден")
+
+    if not os.path.abspath(path).startswith(os.path.abspath(config.IMAGE_FOLDER)):
+        raise PermissionError("Доступ к файлу запрещен")
+    
+    try:
+        # Читаем из кэша (или с диска, если нет в кэше)
+        data = get_thumbnail_data(path)
+        
+        # Определяем MIME тип по расширению
+        ext = os.path.splitext(path)[1].lower()
+        mime_type = "image/webp" if ext == ".webp" else "image/jpeg"
+        return Response(data, mimetype=mime_type)
+    except (IOError, OSError) as e:
+        logger.error(f"Ошибка чтения миниатюры {path}: {e}")
+        raise FileNotFoundError("Файл не найден")
 
 
 @routes.route("/delete_image", methods=["POST"])
