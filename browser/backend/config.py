@@ -6,6 +6,7 @@ from types import SimpleNamespace
 logger = logging.getLogger(__name__)
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
+CONFIG_DIR = os.path.dirname(CONFIG_FILE)
 DEFAULT_CONFIG = {
     "image_folder": "static/images",
     "favorites_folder": "static/images/favorites",
@@ -29,9 +30,15 @@ if os.path.exists(CONFIG_FILE):
     except Exception as e:
         logger.warning(f"Не удалось загрузить config.json: {e}")
 
+def _resolve_path(path: str) -> str:
+    """Разрешает относительный путь относительно директории config.json."""
+    if os.path.isabs(path):
+        return path
+    return os.path.abspath(os.path.join(CONFIG_DIR, path))
+
 config = SimpleNamespace(
-    IMAGE_FOLDER=os.path.abspath(_config["image_folder"]),
-    FAVORITES_FOLDER=os.path.abspath(_config["favorites_folder"]),
+    IMAGE_FOLDER=_resolve_path(_config["image_folder"]),
+    FAVORITES_FOLDER=_resolve_path(_config["favorites_folder"]),
     ALLOWED_EXTENSIONS=set(_config["allowed_extensions"]),
     THUMBNAIL_SIZE=int(_config["thumbnail_size"]),
     ITEMS_PER_PAGE=int(_config["items_per_page"]),
