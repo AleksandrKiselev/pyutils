@@ -1,6 +1,6 @@
 {
-    "image_folder": "d:\\AI-Software\\configs\\images\\",
-    "favorites_folder": "d:\\AI-Software\\configs\\images\\favorites",
+    "image_folder": "..\\diffusion\\images",
+    "favorites_folder": "..\\diffusion\\images\\favorites",
     "thumbnail_size": 512,
     "items_per_page": 20,
     "allowed_extensions": [".png", ".jpg", ".jpeg", ".webp"],

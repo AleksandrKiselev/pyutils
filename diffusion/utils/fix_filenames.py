@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Исправляет имена файлов: транслитерация, замена небуквенных символов на подчеркивание, обрезка длины."""
+"""Исправляет имена файлов: транслитерация, замена проблемных символов на подчеркивание, обрезка длины."""
 
 import argparse
 import re
@@ -36,28 +36,32 @@ def transliterate(text: str) -> str:
     return text.translate(TRANSLIT_TABLE)
 
 
-def replace_non_letters(text: str) -> str:
+def replace_problematic_chars(text: str) -> str:
     """
-    Заменяет все небуквенные символы на нижнее подчеркивание.
+    Заменяет только проблемные символы (запрещенные в Windows) на нижнее подчеркивание.
+    Пробелы и другие допустимые символы сохраняются.
     
     Args:
         text: исходный текст
     
     Returns:
-        текст с замененными небуквенными символами
+        текст с замененными проблемными символами
     """
+    # Запрещенные символы в Windows: < > : " / \ | ? *
+    # Также заменяем управляющие символы (ASCII 0-31)
+    problematic_chars = '<>:"/\\|?*'
     result = []
     for char in text:
-        if char.isalpha():
-            result.append(char)
-        else:
+        if ord(char) < 32 or char in problematic_chars:
             result.append('_')
+        else:
+            result.append(char)
     return ''.join(result)
 
 
 def fix_filename(filename: str, max_length: int = 100) -> str:
     """
-    Исправляет имя файла: транслитерация, замена небуквенных символов на подчеркивание, обрезка длины.
+    Исправляет имя файла: транслитерация, замена проблемных символов на подчеркивание, обрезка длины.
     
     Args:
         filename: исходное имя файла
@@ -74,8 +78,8 @@ def fix_filename(filename: str, max_length: int = 100) -> str:
     # Транслитерируем
     fixed_stem = transliterate(stem)
     
-    # Заменяем все небуквенные символы на подчеркивание
-    fixed_stem = replace_non_letters(fixed_stem)
+    # Заменяем только проблемные символы на подчеркивание
+    fixed_stem = replace_problematic_chars(fixed_stem)
     
     # Убираем множественные подчеркивания (заменяем на одно)
     fixed_stem = re.sub(r'_+', '_', fixed_stem)
@@ -95,6 +99,34 @@ def fix_filename(filename: str, max_length: int = 100) -> str:
         fixed_stem = fixed_stem.rstrip('_')
     
     return fixed_stem + suffix
+
+
+def get_unique_filename(base_path: Path) -> Path:
+    """
+    Находит уникальное имя файла, добавляя суффикс 1, 2 и т.д., если файл уже существует.
+    
+    Args:
+        base_path: базовый путь к файлу
+    
+    Returns:
+        уникальный путь к файлу
+    """
+    if not base_path.exists():
+        return base_path
+    
+    # Разделяем имя и расширение
+    stem = base_path.stem
+    suffix = base_path.suffix
+    parent = base_path.parent
+    
+    # Пытаемся найти свободное имя, добавляя 1, 2 и т.д.
+    counter = 1
+    while True:
+        new_name = f"{stem}{counter}{suffix}"
+        new_path = parent / new_name
+        if not new_path.exists():
+            return new_path
+        counter += 1
 
 
 def fix_filenames_in_directory(
@@ -141,20 +173,24 @@ def fix_filenames_in_directory(
             if original_name == fixed_name:
                 continue
             
-            # Формируем новый путь
-            new_path = file_path.parent / fixed_name
+            # Формируем базовый путь
+            base_path = file_path.parent / fixed_name
             
-            # Проверяем, не существует ли уже файл с таким именем
-            if new_path.exists() and new_path != file_path:
-                tqdm.write(f"Пропущено: '{file_path}' -> '{fixed_name}' (файл уже существует)")
-                stats['errors'] += 1
-                continue
+            # Если файл уже существует и это не тот же файл, находим уникальное имя
+            if base_path.exists() and base_path != file_path:
+                new_path = get_unique_filename(base_path)
+            else:
+                new_path = base_path
             
             if dry_run:
                 tqdm.write(f"[DRY RUN] '{file_path}' -> '{new_path}'")
             else:
                 file_path.rename(new_path)
-                tqdm.write(f"Переименовано: '{original_name}' -> '{fixed_name}'")
+                final_name = new_path.name
+                if final_name != fixed_name:
+                    tqdm.write(f"Переименовано: '{original_name}' -> '{final_name}' (добавлен суффикс)")
+                else:
+                    tqdm.write(f"Переименовано: '{original_name}' -> '{final_name}'")
             
             stats['renamed'] += 1
             progress_bar.set_postfix({
@@ -178,7 +214,7 @@ def fix_filenames_in_directory(
 def parse_args() -> argparse.Namespace:
     """Парсит аргументы командной строки."""
     parser = argparse.ArgumentParser(
-        description='Исправляет имена файлов: транслитерация, замена небуквенных символов на подчеркивание, обрезка длины.',
+        description='Исправляет имена файлов: транслитерация, замена проблемных символов на подчеркивание, обрезка длины.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='Примеры:\n'
                '  %(prog)s D:\\MyFolder\n'
