@@ -71,7 +71,8 @@ def _shutdown_handler(signum, frame):
     """Обработчик сигналов завершения для сохранения БД"""
     logger.info(f"Получен сигнал {signum}, сохранение БД перед завершением...")
     try:
-        metadata_store._db_manager.force_save()
+        metadata_store._db_manager._save_timer.cancel()
+        metadata_store._db_manager._save_to_disk()
         logger.info("БД успешно сохранена")
     except Exception as e:
         logger.error(f"Ошибка сохранения БД при завершении: {e}")
@@ -79,10 +80,9 @@ def _shutdown_handler(signum, frame):
 
 
 if __name__ == "__main__":
-    # Регистрация обработчиков сигналов для корректного завершения
-    signal.signal(signal.SIGINT, _shutdown_handler)  # Ctrl+C
+    signal.signal(signal.SIGINT, _shutdown_handler)
     if hasattr(signal, 'SIGTERM'):
-        signal.signal(signal.SIGTERM, _shutdown_handler)  # Завершение процесса
+        signal.signal(signal.SIGTERM, _shutdown_handler)
     
     debug_mode = _is_debug_mode()
 

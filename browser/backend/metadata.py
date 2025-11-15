@@ -2,7 +2,6 @@ import os
 import re
 import json
 import struct
-import sys
 import zlib
 import hashlib
 import logging
@@ -24,7 +23,7 @@ class MetadataStore:
     
     def initialize(self) -> None:
         self._db_manager.init_database()
-        atexit.register(self._db_manager.force_save)
+        atexit.register(self._db_manager.close)
 
     def _extract_prompt_from_image(self, image_path: str) -> str:
         try:
@@ -57,12 +56,10 @@ class MetadataStore:
 
             metadata = "".join(chunks).strip()
             
-            # Используем улучшенное регулярное выражение с обработкой экранированных символов
             pattern = r'"title"\s*:\s*"PromptTextForBrowser",.*?"widgets_values"\s*:\s*\[\s*\[\s*"((?:[^"\\]|\\.)*)"\s*\]\s*\]'
             match = re.search(pattern, metadata, re.DOTALL)
             if match:
                 prompt = match.group(1)
-                # Декодируем экранированные символы JSON
                 prompt = prompt.replace('\\"', '"').replace('\\\\', '\\').replace('\\n', '\n').replace('\\r', '\r').replace('\\t', '\t')
                 return prompt.strip()
             
@@ -76,15 +73,11 @@ class MetadataStore:
 
     def _calculate_file_hash(self, image_path: str) -> str:
         try:
-            if sys.version_info >= (3, 11):
-                with open(image_path, "rb") as f:
-                    return hashlib.file_digest(f, hashlib.md5).hexdigest()
-            else:
-                hash_md5 = hashlib.md5()
-                with open(image_path, "rb") as f:
-                    for chunk in iter(lambda: f.read(4096), b""):
-                        hash_md5.update(chunk)
-                return hash_md5.hexdigest()
+            hash_md5 = hashlib.md5()
+            with open(image_path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_md5.update(chunk)
+            return hash_md5.hexdigest()
         except Exception as e:
             logger.warning(f"Ошибка вычисления хеша для {image_path}: {e}")
             return ""
@@ -169,10 +162,10 @@ class MetadataStore:
             return
         
         if len(metadata_list) == 1:
-            self._db_manager.save(metadata_list, force_save=False)
+            self._db_manager.save(metadata_list)
         else:
             logger.info(f"Начало batch сохранения {len(metadata_list)} метаданных")
-            self._db_manager.save(metadata_list, force_save=False)
+            self._db_manager.save(metadata_list)
             logger.info(f"Завершено batch сохранение {len(metadata_list)} метаданных")
     
     def update(self, updates: List[Dict[str, Any]]) -> int:
@@ -209,7 +202,7 @@ class MetadataStore:
         if not metadata_ids:
             return 0
         
-        return self._db_manager.delete(metadata_ids, force_save=False)
+        return self._db_manager.delete(metadata_ids)
 
 
 metadata_store = MetadataStore()
