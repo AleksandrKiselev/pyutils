@@ -1,0 +1,3 @@
+[submodule "diffusion/prompts"]
+	path = diffusion/prompts
+	url = ./diffusion/prompts
